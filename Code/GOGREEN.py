@@ -99,8 +99,10 @@ class GOGREEN:
         if fileType == '.fits':
             return Table( fits.getdata( filePath ) ).to_pandas()
         elif fileType == '.dat':
-            headers = pd.read_csv(filePath, delim_whitespace=True, nrows=0, skiprows=1).columns[1:]
-            return pd.read_csv(filePath, sep='\s+', engine='python', header=None, skiprows=2, names=headers)
+            if 'STRUCTURAL_PARA_v1.1_CATONLY' in filePath:
+                headers = pd.read_csv(filePath, delim_whitespace=True, nrows=0, skiprows=1).columns[1:]
+                return pd.read_csv(filePath, sep='\s+', engine='python', header=None, skiprows=2, names=headers)
+            return pd.read_csv(filePath, sep='\s+', engine='python', header=1)
         else:
             print("The ", fileType, " data format is not current implemented!")
             return pd.DataFrame()
