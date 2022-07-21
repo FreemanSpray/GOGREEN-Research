@@ -197,7 +197,7 @@ class GOGREEN:
         return self.catalog[self.catalog['Cluster'] == clusterName]
     # END GETCLUSTERGALAXIES
 
-    def plotPassiveLines(axes:list=None, row:int=None, col:int=None,):
+    def plotPassiveLines(self, axes:list=None, row:int=None, col:int=None,):
         """
         plotPassiveLines (private method) draws the recognized boundary between passive and star-forming galaxies on UVJ plots
         :param axes:                The array of subplots created when the plotType is set to 2.
@@ -208,19 +208,25 @@ class GOGREEN:
                                      Default: None
         :return    :                lines are plotted
         """
-        x1 = np.arange(0, 0.9, 0.1)
+
+        # Generate the data used to plot the line
+        x1 = np.arange(-0.5, 0.9, 0.1)
+        y1 = [1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3]
         x2 = np.arange(0.8, 1.7, 0.1)
-        y2 = np.arange(1.2, 2.1, 0.1)
-        y3 = np.arange(0, 0.9, 0.1)
+        y2 = np.arange(1.3,2.1,0.09)
+        x3 = [1.6,1.6,1.6,1.6,1.6,1.6]
+        y3 = np.arange(2.05, 2.5, 0.09)
+        # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None: #checking for subplots
-                axes[row][col].plot(x1, 1.3 * x1) #plot the first line
-                axes[row][col].plot(x2, y2) #plot the second line
-                axes[row][col].plot(1.6 * y3, y3) #plot the third line
+                axes[row][col].plot(x1, y1, color='black') #plot the first line
+                axes[row][col].plot(x2, y2, color='black') #plot the second line
+                axes[row][col].plot(x3, y3, color='black') #plot the third line
                 return
-        plt.plot(x1, 1.3 * x1) #plot the first line
-        plt.plot(x2, y2) #plot the second line
-        plt.plot(1.6 * y3, y3) #plot the third line
+        # Else plot normally
+        plt.plot(x1, y1, color='black') #plot the first line
+        plt.plot(x2, y2, color='black') #plot the second line
+        plt.plot(x3, y3, color='black') #plot the third line
     #END PLOTPASSIVELINES
 
     def reConvert(self, data:list) -> list:
@@ -533,6 +539,9 @@ class GOGREEN:
                 if fitLine == True:
                     self.MSRfit(passive, useLog)
                     self.MSRfit(starForming, useLog)
+                # Plot passive v star-forming border in the case where we are plotting UVJ color-color
+                if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
+                    self.plotPassiveLines()
             else:
                 print(colorType, ' is not a valid coloring scheme!')
 
@@ -636,6 +645,9 @@ class GOGREEN:
                         if fitLine == True:
                             self.MSRfit(passive, useLog, axes, i, j)
                             self.MSRfit(starForming, useLog, axes, i, j)
+                        # Plot passive v star-forming border in the case where we are plotting UVJ color-color
+                        if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
+                            self.plotPassiveLines(axes, i, j)
                     else:
                         print(colorType, ' is not a valid coloring scheme!')
 
@@ -745,6 +757,9 @@ class GOGREEN:
                     else:
                         plt.scatter(passiveX, passiveY, color=color1, label='Quiescent')
                         plt.scatter(starFormingX, starFormingY,color=color2, label='Star Forming')
+                        # Plot passive v star-forming border in the case where we are plotting UVJ color-color
+                        if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
+                            self.plotPassiveLines()
             # generate best fit line
             if fitLine == True:
                 # In the case of plotting passive vs star forming galaxies, we plot two separate fit lines
