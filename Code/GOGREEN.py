@@ -372,8 +372,7 @@ class GOGREEN:
         # Open file for writing
         f = open(filename, 'w')
         # Create headers
-        f.write('Cluster    | Slope (All)      | Y-Intercept (All) | Slope (Passive Only) | Y-Intercept (Passive Only) | Slope (Star-Forming Only) | Y-Intercept (Star-Forming Only)\n')
-
+        f.write('Cluster Slope_All Y-Intercept_All Slope_Passive Y-Intercept_Passive Slope_SF Y-Intercept_SF\n')
         # Create data sets
         data = pd.DataFrame()
         for clusterName  in self._structClusterNames:
