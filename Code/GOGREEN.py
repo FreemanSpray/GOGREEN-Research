@@ -594,6 +594,34 @@ class GOGREEN:
                 # Plot passive v star-forming border in the case where we are plotting UVJ color-color
                 if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                     self.plotPassiveLines()
+            elif colorType == 'sersic':
+                elliptical = data.query('2.5 < n < 6')
+                spiral = data.query('n < 2.5')
+                ellipticalX = elliptical[xQuantityName].values
+                ellipticalY = elliptical[yQuantityName].values
+                spiralX = spiral[xQuantityName].values
+                spiralY = spiral[yQuantityName].values
+                # Check if either axis is measuring effective radius for the purpose of unit conversion.
+                if xQuantityName == 're':
+                    ellipticalX = self.reConvert(elliptical)
+                    spiralX = self.reConvert(spiral)
+                if yQuantityName == 're':
+                    ellipticalY = self.reConvert(elliptical)
+                    spiralY = self.reConvert(spiral)
+                # Check if either axis needs to be put in log scale
+                if useLog[0] == True:
+                    ellipticalX = np.log10(ellipticalX)
+                    spiralX = np.log10(spiralX)
+                if useLog[1] == True:
+                    ellipticalY = np.log10(ellipticalY)
+                    spiralY = np.log10(spiralY)
+                # Generate the plot
+                plt.scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
+                plt.scatter(spiralX, spiralY, color=color2, label='n < 2.5')
+                # generate best fit line
+                if fitLine == True:
+                    self.MSRfit(elliptical, useLog, color=color1)
+                    self.MSRfit(spiral, useLog, color=color2)
             else:
                 print(colorType, ' is not a valid coloring scheme!')
 
@@ -703,6 +731,34 @@ class GOGREEN:
                         # Plot passive v star-forming border in the case where we are plotting UVJ color-color
                         if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                             self.plotPassiveLines(axes, i, j)
+                    elif colorType == 'sersic':
+                        elliptical = data.query('2.5 < n < 6')
+                        spiral = data.query('n < 2.5')
+                        ellipticalX = elliptical[xQuantityName].values
+                        ellipticalY = elliptical[yQuantityName].values
+                        spiralX = spiral[xQuantityName].values
+                        spiralY = spiral[yQuantityName].values
+                        # Check if either axis is measuring effective radius for the purpose of unit conversion.
+                        if xQuantityName == 're':
+                            ellipticalX = self.reConvert(elliptical)
+                            spiralX = self.reConvert(spiral)
+                        if yQuantityName == 're':
+                            ellipticalY = self.reConvert(elliptical)
+                            spiralY = self.reConvert(spiral)
+                        # Check if either axis needs to be put in log scale
+                        if useLog[0] == True:
+                            ellipticalX = np.log10(ellipticalX)
+                            spiralX = np.log10(spiralX)
+                        if useLog[1] == True:
+                            ellipticalY = np.log10(ellipticalY)
+                            spiralY = np.log10(spiralY)
+                        # Generate the plot
+                        axes[i][j].scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
+                        axes[i][j].scatter(spiralX, spiralY, color=color2, label='n < 2.5')
+                        # generate best fit line
+                        if fitLine == True:
+                            self.MSRfit(elliptical, useLog, axes, i, j, color=color1)
+                            self.MSRfit(spiral, useLog, axes, i, j, color=color2)
                     else:
                         print(colorType, ' is not a valid coloring scheme!')
 
@@ -818,12 +874,47 @@ class GOGREEN:
                         # Plot passive v star-forming border in the case where we are plotting UVJ color-color
                         if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                             self.plotPassiveLines()
+                elif colorType == 'sersic':
+                    elliptical = data.query('2.5 < n < 6')
+                    spiral = data.query('n < 2.5')
+                    ellipticalX = elliptical[xQuantityName].values
+                    ellipticalY = elliptical[yQuantityName].values
+                    spiralX = spiral[xQuantityName].values
+                    spiralY = spiral[yQuantityName].values
+                    # Check if either axis is measuring effective radius for the purpose of unit conversion.
+                    if xQuantityName == 're':
+                        ellipticalX = self.reConvert(elliptical)
+                        spiralX = self.reConvert(spiral)
+                    if yQuantityName == 're':
+                        ellipticalY = self.reConvert(elliptical)
+                        spiralY = self.reConvert(spiral)
+                    # Check if either axis needs to be put in log scale
+                    if useLog[0] == True:
+                        ellipticalX = np.log10(ellipticalX)
+                        spiralX = np.log10(spiralX)
+                    if useLog[1] == True:
+                        ellipticalY = np.log10(ellipticalY)
+                        spiralY = np.log10(spiralY)
+                    # Generate the plot
+                    if (clusterName != self._structClusterNames[-1]):
+                        plt.scatter(ellipticalX, ellipticalY, color=color1)
+                        plt.scatter(spiralX, spiralY, color=color2)
+                    # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
+                    else:
+                        plt.scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
+                        plt.scatter(spiralX, spiralY, color=color2, label='n < 2.5')
+                else:
+                    print(colorType, ' is not a valid coloring scheme!')
             # generate best fit line
             if fitLine == True:
                 # In the case of plotting passive vs star forming galaxies, we plot two separate fit lines
                 if colorType == 'passive':
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, SFRrestrict='passive', color=color1)
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, SFRrestrict='starForming', color=color2)
+                # In the case of plotting elliptical vs spiral inclined galaxies (based on Sersic index), we plot two separate fit lines NOTE: Handling of these cases not yet implemented in MSRfit()
+                elif colorType == 'sersic':
+                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, SFRrestrict='elliptical', color=color1)
+                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, SFRrestrict='spiral', color=color2)
                 else:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards)
         else:
