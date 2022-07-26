@@ -381,9 +381,124 @@ class GOGREEN:
         plt.plot(xFitData, m * xFitData + b, color=color)
     # END MSRFIT
 
+    def getRatio(self, category:str='SF', x:float=None, y:float=None) -> list:
+        """
+        :param : category - the name of the category to consider when making comparisons
+                             Default: 'SF' - indicates passive vs star-forming should be compared
+        :param : x - the x value at which the comparison should be made
+                             Default: None
+        :param : y - the y value at which the comparison should be made
+                             Default: None
+        :return: 
+        """
+        # Set an initial value to append to.
+        memberData = pd.DataFrame()
+        nonMemberData = pd.DataFrame()
+        for clusterName  in self._structClusterNames:
+            # Get data for this cluster for galaxies classified as members
+            memberData = memberData.append(self.getMembers(clusterName))
+            nonMemberData = nonMemberData.append(self.getNonMembers(clusterName))
+        # Apply other specified reducing constraints
+        memberData = self.reduceDF(memberData, None, True)
+        nonMemberData = self.reduceDF(nonMemberData, None, True)
+        # Handle case where only passive galaxies out of all data need to plotted.
+        if category == 'SF':
+            memberDataQ = memberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
+            memberDataSF = memberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
+            nonMemberDataQ = nonMemberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
+            nonMemberDataSF = nonMemberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
+
+            # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
+            memberSizeQ = self.reConvert(memberDataQ)
+            memberSizeSF = self.reConvert(memberDataSF)
+            nonMemberSizeQ = self.reConvert(nonMemberDataQ)
+            nonMemberSizeSF = self.reConvert(nonMemberDataSF)
+
+            memberMassQ = memberDataQ['Mstellar'].values
+            memberMassSF = memberDataSF['Mstellar'].values
+            nonMemberMassQ = nonMemberDataQ['Mstellar'].values
+            nonMemberMassSF = nonMemberDataSF['Mstellar'].values
+            badDataIndices = []
+            for i in range(0, len(memberMassQ)):
+                # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
+                if np.isnan(memberMassQ[i]) == True:
+                    # Add the index of this data point to the list of those to be removed once all data points have been checked.
+                    badDataIndices.append(i)
+            for j in range(0, len(badDataIndices)):
+                # Iterate through the array of indices, removing the data at these indices from both axis arrays.
+                memberMassQ = np.delete(memberMassQ, badDataIndices[j])
+                memberSizeQ = np.delete(memberSizeQ, badDataIndices[j])
+                # Adjusting badDataIndices to account for reduced count of all further recorded indices
+                for k in range(0, len(badDataIndices)):
+                    badDataIndices[k] = badDataIndices[k] - 1
+            for i in range(0, len(memberMassSF)):
+                # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
+                if np.isnan(memberMassSF[i]) == True:
+                    # Add the index of this data point to the list of those to be removed once all data points have been checked.
+                    badDataIndices.append(i)
+            for j in range(0, len(badDataIndices)):
+                # Iterate through the array of indices, removing the data at these indices from both axis arrays.
+                memberMassSF = np.delete(memberMassSF, badDataIndices[j])
+                memberSizeSF = np.delete(memberSizeSF, badDataIndices[j])
+                # Adjusting badDataIndices to account for reduced count of all further recorded indices
+                for k in range(0, len(badDataIndices)):
+                    badDataIndices[k] = badDataIndices[k] - 1
+            for i in range(0, len(nonMemberMassQ)):
+                # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
+                if np.isnan(nonMemberMassQ[i]) == True:
+                    # Add the index of this data point to the list of those to be removed once all data points have been checked.
+                    badDataIndices.append(i)
+            for j in range(0, len(badDataIndices)):
+                # Iterate through the array of indices, removing the data at these indices from both axis arrays.
+                nonMemberMassQ = np.delete(nonMemberMassQ, badDataIndices[j])
+                nonMemberSizeQ = np.delete(nonMemberSizeQ, badDataIndices[j])
+                # Adjusting badDataIndices to account for reduced count of all further recorded indices
+                for k in range(0, len(badDataIndices)):
+                    badDataIndices[k] = badDataIndices[k] - 1
+            for i in range(0, len(nonMemberMassSF)):
+                # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
+                if np.isnan(nonMemberMassSF[i]) == True:
+                    # Add the index of this data point to the list of those to be removed once all data points have been checked.
+                    badDataIndices.append(i)
+            for j in range(0, len(badDataIndices)):
+                # Iterate through the array of indices, removing the data at these indices from both axis arrays.
+                nonMemberMassSF = np.delete(nonMemberMassSF, badDataIndices[j])
+                nonMemberSizeSF = np.delete(nonMemberSizeSF, badDataIndices[j])
+                # Adjusting badDataIndices to account for reduced count of all further recorded indices
+                for k in range(0, len(badDataIndices)):
+                    badDataIndices[k] = badDataIndices[k] - 1
+            mMemberQ, bMemberQ = np.polyfit(memberMassQ, memberSizeQ, 1)
+            mMemberSF, bMemberSF = np.polyfit(memberMassSF, memberSizeSF, 1)
+            mNonMemberQ, bNonMemberQ = np.polyfit(nonMemberMassQ, nonMemberSizeQ, 1)
+            mNonMemberSF, bNonMemberSF = np.polyfit(nonMemberMassSF, nonMemberSizeSF, 1)
+            if x != None:
+                pointMemberQ = x*mMemberQ + bMemberQ
+                pointMemberSF = x*mMemberSF + bMemberSF 
+                pointNonMemberQ = x*mNonMemberQ + bNonMemberQ 
+                pointNonMemberSF = x*mNonMemberSF + bNonMemberSF
+                ratioQ = pointMemberQ/pointNonMemberQ
+                ratioSF = pointMemberSF/pointNonMemberSF
+                return [ratioQ, ratioSF]
+            elif y != None:
+                pointMemberQ = y*mMemberQ + bMemberQ
+                pointMemberSF = y*mMemberSF + bMemberSF 
+                pointNonMemberQ = y*mNonMemberQ + bNonMemberQ 
+                pointNonMemberSF = y*mNonMemberSF + bNonMemberSF
+                ratioQ = pointMemberQ/pointNonMemberQ
+                ratioSF = pointMemberSF/pointNonMemberSF
+                return [ratioQ, ratioSF]
+            else:
+                print("No point of comparison provided")
+                return [-1]     
+        else:
+            print(category + " is not a valid category")
+            return [-1]
+
+    #END GETRATIO
+
     def makeTable(self, filename):
         """
-        :param : f - the name of the file to write to.
+        :param : filename - the name of the file to write to.
         :return: writes slope and y-intercept of best fit lines of all, passive, and star forming galaxies in each cluster to the file 'output.txt' (better file type to be implemented in the future)
         """
         # Open file for writing
