@@ -381,7 +381,7 @@ class GOGREEN:
         plt.plot(xFitData, m * xFitData + b, color=color)
     # END MSRFIT
 
-    def getRatio(self, category:str='SF', x:float=None, y:float=None) -> list:
+    def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
         """
         :param : category - the name of the category to consider when making comparisons
                              Default: 'SF' - indicates passive vs star-forming should be compared
@@ -431,6 +431,7 @@ class GOGREEN:
                 # Adjusting badDataIndices to account for reduced count of all further recorded indices
                 for k in range(0, len(badDataIndices)):
                     badDataIndices[k] = badDataIndices[k] - 1
+            badDataIndices = []
             for i in range(0, len(memberMassSF)):
                 # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
                 if np.isnan(memberMassSF[i]) == True:
@@ -443,6 +444,7 @@ class GOGREEN:
                 # Adjusting badDataIndices to account for reduced count of all further recorded indices
                 for k in range(0, len(badDataIndices)):
                     badDataIndices[k] = badDataIndices[k] - 1
+            badDataIndices = []
             for i in range(0, len(nonMemberMassQ)):
                 # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
                 if np.isnan(nonMemberMassQ[i]) == True:
@@ -455,6 +457,7 @@ class GOGREEN:
                 # Adjusting badDataIndices to account for reduced count of all further recorded indices
                 for k in range(0, len(badDataIndices)):
                     badDataIndices[k] = badDataIndices[k] - 1
+            badDataIndices = []
             for i in range(0, len(nonMemberMassSF)):
                 # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
                 if np.isnan(nonMemberMassSF[i]) == True:
@@ -467,10 +470,32 @@ class GOGREEN:
                 # Adjusting badDataIndices to account for reduced count of all further recorded indices
                 for k in range(0, len(badDataIndices)):
                     badDataIndices[k] = badDataIndices[k] - 1
+            memberMassQ = np.log10(memberMassQ)
+            memberSizeQ = np.log10(memberSizeQ)
+            memberMassSF = np.log10(memberMassSF)
+            memberSizeSF = np.log10(memberSizeSF)
+            nonMemberMassQ = np.log10(nonMemberMassQ)
+            nonMemberSizeQ = np.log10(nonMemberSizeQ)
+            nonMemberMassSF = np.log10(nonMemberMassSF)
+            nonMemberSizeSF = np.log10(nonMemberSizeSF)
             mMemberQ, bMemberQ = np.polyfit(memberMassQ, memberSizeQ, 1)
             mMemberSF, bMemberSF = np.polyfit(memberMassSF, memberSizeSF, 1)
             mNonMemberQ, bNonMemberQ = np.polyfit(nonMemberMassQ, nonMemberSizeQ, 1)
             mNonMemberSF, bNonMemberSF = np.polyfit(nonMemberMassSF, nonMemberSizeSF, 1)
+            if plotLines:
+                plt.plot(memberMassQ, mMemberQ * memberMassQ + bMemberQ, label='quiescent members')
+                plt.plot(memberMassSF, mMemberSF * memberMassSF + bMemberSF, label='star-forming members')
+                plt.plot(nonMemberMassQ, mNonMemberQ * nonMemberMassQ + bNonMemberQ, label='quiescent non-members')
+                plt.plot(nonMemberMassSF, mNonMemberSF * nonMemberMassSF + bNonMemberSF, label='star-forming non-members')
+                plt.legend()
+                if xRange != None:
+                    if len(xRange) > 1:
+                        plt.xlim(xRange[0], xRange[1])
+                if yRange != None:
+                    if len(yRange) > 1:
+                        plt.ylim(yRange[0], yRange[1])
+                plt.xlabel('log(Mstellar)')
+                plt.ylabel('log(Re)')
             if x != None:
                 pointMemberQ = x*mMemberQ + bMemberQ
                 pointMemberSF = x*mMemberSF + bMemberSF 
@@ -480,10 +505,10 @@ class GOGREEN:
                 ratioSF = pointMemberSF/pointNonMemberSF
                 return [ratioQ, ratioSF]
             elif y != None:
-                pointMemberQ = y*mMemberQ + bMemberQ
-                pointMemberSF = y*mMemberSF + bMemberSF 
-                pointNonMemberQ = y*mNonMemberQ + bNonMemberQ 
-                pointNonMemberSF = y*mNonMemberSF + bNonMemberSF
+                pointMemberQ = (y/mMemberQ) - (bMemberQ/mMemberQ)
+                pointMemberSF = (y/mMemberSF) - (bMemberSF/mMemberSF)
+                pointNonMemberQ = (y/mNonMemberQ) - (bNonMemberQ/mNonMemberQ) 
+                pointNonMemberSF = (y/mNonMemberSF) - (bNonMemberSF/mNonMemberSF) 
                 ratioQ = pointMemberQ/pointNonMemberQ
                 ratioSF = pointMemberSF/pointNonMemberSF
                 return [ratioQ, ratioSF]
