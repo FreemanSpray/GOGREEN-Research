@@ -383,13 +383,13 @@ class GOGREEN:
 
     def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
         """
-        :param : category - the name of the category to consider when making comparisons
+        :param category:    Name of the category to consider when making comparisons
                              Default: 'SF' - indicates passive vs star-forming should be compared
-        :param : x - the x value at which the comparison should be made
+        :param x:           X value at which the comparison should be made
                              Default: None
-        :param : y - the y value at which the comparison should be made
+        :param y:           Y value at which the comparison should be made
                              Default: None
-        :return: 
+        :return: size 2 list of the two ratios of member over non-member galaxies (first element is for quiescent, second is for star-forming)
         """
         # Set an initial value to append to.
         memberData = pd.DataFrame()
@@ -518,8 +518,108 @@ class GOGREEN:
         else:
             print(category + " is not a valid category")
             return [-1]
-
     #END GETRATIO
+
+    def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
+        """
+        :param category:     Name of the category to consider when making comparisons
+        :param xRange  :     List containing the desired lower and upper bounds for the x-axis
+                              Default: None
+        :param yRange  :     List containing the desired lower and upper bounds for the y-axis
+                              Default: None
+
+        :return: medians are plotted
+        """
+        # Set an initial value to append to.
+        memberData = pd.DataFrame()
+        nonMemberData = pd.DataFrame()
+        for clusterName  in self._structClusterNames:
+            # Get data for this cluster for galaxies classified as members
+            memberData = memberData.append(self.getMembers(clusterName))
+            nonMemberData = nonMemberData.append(self.getNonMembers(clusterName))
+        # Apply other specified reducing constraints
+        memberData = self.reduceDF(memberData, None, True)
+        nonMemberData = self.reduceDF(nonMemberData, None, True)
+        # Handle case where only passive galaxies out of all data need to plotted.
+        if category == 'SF':
+            memberDataQ = memberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
+            memberDataSF = memberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
+            nonMemberDataQ = nonMemberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
+            nonMemberDataSF = nonMemberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
+
+            MQbin1 = memberDataQ.query('(Mstellar > 10000000) and (Mstellar < 1000000000)')
+            MSFbin1 = memberDataSF.query('Mstellar > 10000000 and Mstellar < 1000000000')
+            NMQbin1 = nonMemberDataQ.query('Mstellar > 10000000 and Mstellar < 1000000000')
+            NMSFbin1 = nonMemberDataSF.query('Mstellar > 10000000 and Mstellar < 1000000000')
+            MQbin2 = memberDataQ.query('Mstellar > 1000000000 and Mstellar < 10000000000')
+            MSFbin2 = memberDataSF.query('Mstellar > 1000000000 and Mstellar < 10000000000')
+            NMQbin2 = nonMemberDataQ.query('Mstellar > 1000000000 and Mstellar < 10000000000')
+            NMSFbin2 = nonMemberDataSF.query('Mstellar > 1000000000 and Mstellar < 10000000000')
+            MQbin3 = memberDataQ.query('Mstellar > 10000000000 and Mstellar < 100000000000')
+            MSFbin3 = memberDataSF.query('Mstellar > 10000000000 and Mstellar < 100000000000')
+            NMQbin3 = nonMemberDataQ.query('Mstellar > 10000000000 and Mstellar < 100000000000')
+            NMSFbin3 = nonMemberDataSF.query('Mstellar > 10000000000 and Mstellar < 100000000000')
+
+            # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
+
+            sizeMQbin1 = self.reConvert(MQbin1)
+            sizeMSFbin1 = self.reConvert(MSFbin1)
+            sizeNMQbin1 = self.reConvert(NMQbin1)
+            sizeNMSFbin1 = self.reConvert(NMSFbin1)
+            sizeMQbin2 = self.reConvert(MQbin2)
+            sizeMSFbin2 = self.reConvert(MSFbin2)
+            sizeNMQbin2 = self.reConvert(NMQbin2)
+            sizeNMSFbin2 = self.reConvert(NMSFbin2)
+            sizeMQbin3 = self.reConvert(MQbin3)
+            sizeMSFbin3 = self.reConvert(MSFbin3)
+            sizeNMQbin3 = self.reConvert(NMQbin3)
+            sizeNMSFbin3 = self.reConvert(NMSFbin3)
+
+            medianMQbin1 = np.median(sizeMQbin1)
+            medianMSFbin1 = np.median(sizeMSFbin1)
+            medianNMQbin1 = np.median(sizeNMQbin1)
+            medianNMSFbin1 = np.median(sizeNMSFbin1)
+            medianMQbin2 = np.median(sizeMQbin2)
+            medianMSFbin2 = np.median(sizeMSFbin2)
+            medianNMQbin2 = np.median(sizeNMQbin2)
+            medianNMSFbin2 = np.median(sizeNMSFbin2)
+            medianMQbin3 = np.median(sizeMQbin3)
+            medianMSFbin3 = np.median(sizeMSFbin3)
+            medianNMQbin3 = np.median(sizeNMQbin3)
+            medianNMSFbin3 = np.median(sizeNMSFbin3)
+
+            medianMQbin1 = np.log10(medianMQbin1)
+            medianMSFbin1 = np.log10(medianMSFbin1)
+            medianNMQbin1 = np.log10(medianNMQbin1)
+            medianNMSFbin1 = np.log10(medianNMSFbin1)
+            medianMQbin2 = np.log10(medianMQbin2)
+            medianMSFbin2 = np.log10(medianMSFbin2)
+            medianNMQbin2 = np.log10(medianNMQbin2)
+            medianNMSFbin2 = np.log10(medianNMSFbin2)
+            medianMQbin3 = np.log10(medianMQbin3)
+            medianMSFbin3 = np.log10(medianMSFbin3)
+            medianNMQbin3 = np.log10(medianNMQbin3)
+            medianNMSFbin3 = np.log10(medianNMSFbin3)
+
+            xValues = [8.5, 9.5, 10.5]
+            yValuesMQ = [medianMQbin1, medianMQbin2, medianMQbin3]
+            yValuesMSF = [medianMSFbin1, medianMSFbin2, medianMSFbin3]
+            yValuesNMQ = [medianNMQbin1, medianNMQbin2, medianNMQbin3]
+            yValuesNMSF= [medianNMSFbin1, medianNMSFbin2, medianNMSFbin3]
+            plt.scatter(xValues, yValuesMQ, label='quiescent members')
+            plt.scatter(xValues, yValuesMSF, label='star-forming members')
+            plt.scatter(xValues, yValuesNMQ, label='quiescent non-members')
+            plt.scatter(xValues, yValuesNMSF, label='star-forming non-members')
+            plt.legend()
+            if xRange != None:
+                if len(xRange) > 1:
+                    plt.xlim(xRange[0], xRange[1])
+            if yRange != None:
+                if len(yRange) > 1:
+                    plt.ylim(yRange[0], yRange[1])
+            plt.xlabel('log(Mstellar)')
+            plt.ylabel('log(Re)')
+    #END GETMEDIAN
 
     def makeTable(self, filename):
         """
