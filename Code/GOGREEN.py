@@ -236,23 +236,20 @@ class GOGREEN:
         """
 
         # Generate the data used to plot the line
-        x1 = np.arange(-0.5, 0.9, 0.1)
-        y1 = [1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3]
-        x2 = np.arange(0.8, 1.7, 0.1)
-        y2 = np.arange(1.3,2.1,0.09)
-        x3 = [1.6,1.6,1.6,1.6,1.6,1.6]
-        y3 = np.arange(2.05, 2.5, 0.09)
+        x = [-5, 0.7, 1.6, 1.6]
+        y = [1.3, 1.3, 2.2, 5]
+        #y1 = [1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3]
+        #x2 = np.arange(0.7, 1.7, 0.1)
+        #y2 = np.arange(1.3,2.2,0.09)
+        #x3 = [1.6,1.6,1.6,1.6,1.6,1.6]
+        #y3 = np.arange(2.05, 2.5, 0.09)
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None: #checking for subplots
-                axes[row][col].plot(x1, y1, color='black') #plot the first line
-                axes[row][col].plot(x2, y2, color='black') #plot the second line
-                axes[row][col].plot(x3, y3, color='black') #plot the third line
+                axes[row][col].plot(x, y, color='black') #plot the lines
                 return
         # Else plot normally
-        plt.plot(x1, y1, color='black') #plot the first line
-        plt.plot(x2, y2, color='black') #plot the second line
-        plt.plot(x3, y3, color='black') #plot the third line
+        plt.plot(x1, y1, color='black') #plot the lines
     #END PLOTPASSIVELINES
 
     def reConvert(self, data:list) -> list:
@@ -547,18 +544,22 @@ class GOGREEN:
             nonMemberDataQ = nonMemberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
             nonMemberDataSF = nonMemberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
 
-            MQbin1 = memberDataQ.query('(Mstellar > 10000000) and (Mstellar < 1000000000)')
-            MSFbin1 = memberDataSF.query('Mstellar > 10000000 and Mstellar < 1000000000')
-            NMQbin1 = nonMemberDataQ.query('Mstellar > 10000000 and Mstellar < 1000000000')
-            NMSFbin1 = nonMemberDataSF.query('Mstellar > 10000000 and Mstellar < 1000000000')
-            MQbin2 = memberDataQ.query('Mstellar > 1000000000 and Mstellar < 10000000000')
-            MSFbin2 = memberDataSF.query('Mstellar > 1000000000 and Mstellar < 10000000000')
-            NMQbin2 = nonMemberDataQ.query('Mstellar > 1000000000 and Mstellar < 10000000000')
-            NMSFbin2 = nonMemberDataSF.query('Mstellar > 1000000000 and Mstellar < 10000000000')
-            MQbin3 = memberDataQ.query('Mstellar > 10000000000 and Mstellar < 100000000000')
-            MSFbin3 = memberDataSF.query('Mstellar > 10000000000 and Mstellar < 100000000000')
-            NMQbin3 = nonMemberDataQ.query('Mstellar > 10000000000 and Mstellar < 100000000000')
-            NMSFbin3 = nonMemberDataSF.query('Mstellar > 10000000000 and Mstellar < 100000000000')
+            MQbin1 = memberDataQ.query('(Mstellar > 3162280000) and (Mstellar < 10000000000)')
+            MSFbin1 = memberDataSF.query('Mstellar > 3162280000 and Mstellar < 10000000000')
+            NMQbin1 = nonMemberDataQ.query('Mstellar > 3162280000 and Mstellar < 10000000000')
+            NMSFbin1 = nonMemberDataSF.query('Mstellar > 3162280000 and Mstellar < 10000000000')
+            MQbin2 = memberDataQ.query('Mstellar > 10000000000 and Mstellar < 31622800000')
+            MSFbin2 = memberDataSF.query('Mstellar > 10000000000 and Mstellar < 31622800000')
+            NMQbin2 = nonMemberDataQ.query('Mstellar > 10000000000 and Mstellar < 31622800000')
+            NMSFbin2 = nonMemberDataSF.query('Mstellar > 10000000000 and Mstellar < 31622800000')
+            MQbin3 = memberDataQ.query('Mstellar > 31622800000 and Mstellar < 100000000000')
+            MSFbin3 = memberDataSF.query('Mstellar > 31622800000 and Mstellar < 100000000000')
+            NMQbin3 = nonMemberDataQ.query('Mstellar > 31622800000 and Mstellar < 100000000000')
+            NMSFbin3 = nonMemberDataSF.query('Mstellar > 31622800000 and Mstellar < 100000000000')
+            MQbin4 = memberDataQ.query('Mstellar > 100000000000 and Mstellar < 316228000000')
+            MSFbin4 = memberDataSF.query('Mstellar > 100000000000 and Mstellar < 316228000000')
+            NMQbin4 = nonMemberDataQ.query('Mstellar > 100000000000 and Mstellar < 316228000000')
+            NMSFbin4 = nonMemberDataSF.query('Mstellar > 100000000000 and Mstellar < 316228000000')
 
             # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
 
@@ -574,6 +575,10 @@ class GOGREEN:
             sizeMSFbin3 = self.reConvert(MSFbin3)
             sizeNMQbin3 = self.reConvert(NMQbin3)
             sizeNMSFbin3 = self.reConvert(NMSFbin3)
+            sizeMQbin4 = self.reConvert(MQbin4)
+            sizeMSFbin4 = self.reConvert(MSFbin4)
+            sizeNMQbin4 = self.reConvert(NMQbin4)
+            sizeNMSFbin4 = self.reConvert(NMSFbin4)
 
             medianMQbin1 = np.median(sizeMQbin1)
             medianMSFbin1 = np.median(sizeMSFbin1)
@@ -587,6 +592,10 @@ class GOGREEN:
             medianMSFbin3 = np.median(sizeMSFbin3)
             medianNMQbin3 = np.median(sizeNMQbin3)
             medianNMSFbin3 = np.median(sizeNMSFbin3)
+            medianMQbin4 = np.median(sizeMQbin4)
+            medianMSFbin4 = np.median(sizeMSFbin4)
+            medianNMQbin4 = np.median(sizeNMQbin4)
+            medianNMSFbin4 = np.median(sizeNMSFbin4)
 
             medianMQbin1 = np.log10(medianMQbin1)
             medianMSFbin1 = np.log10(medianMSFbin1)
@@ -600,12 +609,16 @@ class GOGREEN:
             medianMSFbin3 = np.log10(medianMSFbin3)
             medianNMQbin3 = np.log10(medianNMQbin3)
             medianNMSFbin3 = np.log10(medianNMSFbin3)
+            medianMQbin4 = np.log10(medianMQbin4)
+            medianMSFbin4 = np.log10(medianMSFbin4)
+            medianNMQbin4 = np.log10(medianNMQbin4)
+            medianNMSFbin4 = np.log10(medianNMSFbin4)
 
-            xValues = [8.5, 9.5, 10.5]
-            yValuesMQ = [medianMQbin1, medianMQbin2, medianMQbin3]
-            yValuesMSF = [medianMSFbin1, medianMSFbin2, medianMSFbin3]
-            yValuesNMQ = [medianNMQbin1, medianNMQbin2, medianNMQbin3]
-            yValuesNMSF= [medianNMSFbin1, medianNMSFbin2, medianNMSFbin3]
+            xValues = [9.75, 10.25, 10.75, 11.25]
+            yValuesMQ = [medianMQbin1, medianMQbin2, medianMQbin3, medianMQbin4]
+            yValuesMSF = [medianMSFbin1, medianMSFbin2, medianMSFbin3, medianMSFbin4]
+            yValuesNMQ = [medianNMQbin1, medianNMQbin2, medianNMQbin3, medianNMQbin4]
+            yValuesNMSF= [medianNMSFbin1, medianNMSFbin2, medianNMSFbin3, medianNMSFbin4]
             plt.scatter(xValues, yValuesMQ, label='quiescent members')
             plt.scatter(xValues, yValuesMSF, label='star-forming members')
             plt.scatter(xValues, yValuesNMQ, label='quiescent non-members')
@@ -807,12 +820,13 @@ class GOGREEN:
                 if fitLine == True:
                     self.MSRfit(data, useLog)
             elif colorType == 'passive':
-                # Build passive query string (from van der Burg et al. 2020)
-                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
+                # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
+                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
+                # Build active query string, limiting mass to > 10^9.5
+                starFormingQuery = '(UMINV <= 1.3) and (VMINJ <= 1.6) and (UMINV <= 0.60+VMINJ) and Mstellar > 3162280000'
                 # Extract desired quantities from data
                 passive = data.query(passiveQuery)
-                # Assume star forming are those that are not passive
-                starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])]
+                starForming = data.query(starFormingQuery)
                 passiveX = passive[xQuantityName].values
                 passiveY = passive[yQuantityName].values
                 starFormingX = starForming[xQuantityName].values
@@ -944,12 +958,13 @@ class GOGREEN:
                         if fitLine == True:
                             self.MSRfit(data, useLog, axes, i, j)
                     elif colorType == 'passive':
-                        # Build passive query string (from van der Burg et al. 2020)
-                        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
+                        # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
+                        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
+                        # Build active query string, limiting mass to > 10^9.5
+                        starFormingQuery = '(UMINV <= 1.3) and (VMINJ <= 1.6) and (UMINV <= 0.60+VMINJ) and Mstellar > 3162280000'
                         # Extract desired quantities from data
                         passive = data.query(passiveQuery)
-                        # Assume star forming are those that are not passive
-                        starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])]
+                        starForming = data.query(starFormingQuery)
                         passiveX = passive[xQuantityName].values
                         passiveY = passive[yQuantityName].values
                         starFormingX = starForming[xQuantityName].values
@@ -1086,12 +1101,13 @@ class GOGREEN:
                         plt.scatter(specXData, specYData, color=color1, label='Spectroscopic z')
                         plt.scatter(photXData, photYData, color=color2, label='Photometric z')
                 elif colorType == 'passive':
-                    # Build passive query string (from van der Burg et al. 2020)
-                    passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                     # Extract desired quantities from data
+                    # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
+                    passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
+                    # Build active query string, limiting mass to > 10^9.5
+                    starFormingQuery = '(UMINV <= 1.3) and (VMINJ <= 1.6) and (UMINV <= 0.60+VMINJ) and Mstellar > 3162280000'
+                    # Extract desired quantities from data
                     passive = data.query(passiveQuery)
-                    # Assume star forming are those that are not passive
-                    starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])]
+                    starForming = data.query(starFormingQuery)
                     passiveX = passive[xQuantityName].values
                     passiveY = passive[yQuantityName].values
                     starFormingX = starForming[xQuantityName].values
