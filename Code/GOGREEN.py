@@ -238,11 +238,6 @@ class GOGREEN:
         # Generate the data used to plot the line
         x = [-5, 0.7, 1.6, 1.6]
         y = [1.3, 1.3, 2.2, 5]
-        #y1 = [1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3]
-        #x2 = np.arange(0.7, 1.7, 0.1)
-        #y2 = np.arange(1.3,2.2,0.09)
-        #x3 = [1.6,1.6,1.6,1.6,1.6,1.6]
-        #y3 = np.arange(2.05, 2.5, 0.09)
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None: #checking for subplots
@@ -624,6 +619,7 @@ class GOGREEN:
             plt.scatter(xValues, yValuesNMQ, label='quiescent non-members')
             plt.scatter(xValues, yValuesNMSF, label='star-forming non-members')
             plt.legend()
+            self.plotUncertainties(sizeMQbin1, medianMQbin1, 9.75)
             if xRange != None:
                 if len(xRange) > 1:
                     plt.xlim(xRange[0], xRange[1])
@@ -633,6 +629,14 @@ class GOGREEN:
             plt.xlabel('log(Mstellar)')
             plt.ylabel('log(Re)')
     #END GETMEDIAN
+
+    def plotUncertainties(self, data:list=None, median:int=None, bin:int=None):
+        unLeft = np.percentile(data, 25)
+        unRight = np.percentile(data, 75)
+        x = [bin, bin]
+        y = [median - unRight, median + unRight]
+        plt.plot(x, y)
+    #END GETUNCERTAINTY
 
     def makeTable(self, filename):
         """
