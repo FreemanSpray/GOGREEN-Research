@@ -381,6 +381,11 @@ class GOGREEN:
                              Default: None
         :param y:           Y value at which the comparison should be made
                              Default: None
+        :param plotLines:  
+        :param xRange:     List containing the desired lower and upper bounds for the x-axis
+                            Default: None
+        :param yRange:     List containing the desired lower and upper bounds for the y-axis
+                            Default: None
         :return: size 2 list of the two ratios of member over non-member galaxies (first element is for quiescent, second is for star-forming)
         """
         # Set an initial value to append to.
@@ -514,11 +519,13 @@ class GOGREEN:
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None, printError:bool=False):
         """
-        :param category:     Name of the category to consider when making comparisons
-        :param xRange  :     List containing the desired lower and upper bounds for the x-axis
-                              Default: None
-        :param yRange  :     List containing the desired lower and upper bounds for the y-axis
-                              Default: None
+        :param category  :     Name of the category to consider when making comparisons
+        :param xRange    :     List containing the desired lower and upper bounds for the x-axis
+                                Default: None
+        :param yRange    :     List containing the desired lower and upper bounds for the y-axis
+                                Default: None
+        :param printError:     flag indicating whether or not standard error values should printed alongside the plot
+                                Default: False
 
         :return: medians are plotted
         """
@@ -538,7 +545,7 @@ class GOGREEN:
             memberDataSF = memberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
             nonMemberDataQ = nonMemberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
             nonMemberDataSF = nonMemberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-
+            # Separate each of the 4 data sets into 4 mass bins
             MQbin1 = memberDataQ.query('(Mstellar > 3162280000) and (Mstellar < 10000000000)')
             MSFbin1 = memberDataSF.query('Mstellar > 3162280000 and Mstellar < 10000000000')
             NMQbin1 = nonMemberDataQ.query('Mstellar > 3162280000 and Mstellar < 10000000000')
@@ -555,9 +562,7 @@ class GOGREEN:
             MSFbin4 = memberDataSF.query('Mstellar > 100000000000 and Mstellar < 316228000000')
             NMQbin4 = nonMemberDataQ.query('Mstellar > 100000000000 and Mstellar < 316228000000')
             NMSFbin4 = nonMemberDataSF.query('Mstellar > 100000000000 and Mstellar < 316228000000')
-
             # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-
             sizeMQbin1 = self.reConvert(MQbin1)
             sizeMSFbin1 = self.reConvert(MSFbin1)
             sizeNMQbin1 = self.reConvert(NMQbin1)
@@ -574,7 +579,24 @@ class GOGREEN:
             sizeMSFbin4 = self.reConvert(MSFbin4)
             sizeNMQbin4 = self.reConvert(NMQbin4)
             sizeNMSFbin4 = self.reConvert(NMSFbin4)
-
+            # Convert sizes to log10
+            sizeMQbin1 = np.log10(sizeMQbin1)
+            sizeMSFbin1 = np.log10(sizeMSFbin1)
+            sizeNMQbin1 = np.log10(sizeNMQbin1)
+            sizeNMSFbin1 = np.log10(sizeNMSFbin1)
+            sizeMQbin2 = np.log10(sizeMQbin2)
+            sizeMSFbin2 = np.log10(sizeMSFbin2)
+            sizeNMQbin2 = np.log10(sizeNMQbin2)
+            sizeNMSFbin2 = np.log10(sizeNMSFbin2)
+            sizeMQbin3 = np.log10(sizeMQbin3)
+            sizeMSFbin3 = np.log10(sizeMSFbin3)
+            sizeNMQbin3 = np.log10(sizeNMQbin3)
+            sizeNMSFbin3 = np.log10(sizeNMSFbin3)
+            sizeMQbin4 = np.log10(sizeMQbin4)
+            sizeMSFbin4 = np.log10(sizeMSFbin4)
+            sizeNMQbin4 = np.log10(sizeNMQbin4)
+            sizeNMSFbin4 = np.log10(sizeNMSFbin4)
+            # Calculate median for each data set
             medianMQbin1 = np.median(sizeMQbin1)
             medianMSFbin1 = np.median(sizeMSFbin1)
             medianNMQbin1 = np.median(sizeNMQbin1)
@@ -592,78 +614,59 @@ class GOGREEN:
             medianNMQbin4 = np.median(sizeNMQbin4)
             medianNMSFbin4 = np.median(sizeNMSFbin4)
 
-            medianMQbin1 = np.log10(medianMQbin1)
-            medianMSFbin1 = np.log10(medianMSFbin1)
-            medianNMQbin1 = np.log10(medianNMQbin1)
-            medianNMSFbin1 = np.log10(medianNMSFbin1)
-            medianMQbin2 = np.log10(medianMQbin2)
-            medianMSFbin2 = np.log10(medianMSFbin2)
-            medianNMQbin2 = np.log10(medianNMQbin2)
-            medianNMSFbin2 = np.log10(medianNMSFbin2)
-            medianMQbin3 = np.log10(medianMQbin3)
-            medianMSFbin3 = np.log10(medianMSFbin3)
-            medianNMQbin3 = np.log10(medianNMQbin3)
-            medianNMSFbin3 = np.log10(medianNMSFbin3)
-            medianMQbin4 = np.log10(medianMQbin4)
-            medianMSFbin4 = np.log10(medianMSFbin4)
-            medianNMQbin4 = np.log10(medianNMQbin4)
-            medianNMSFbin4 = np.log10(medianNMSFbin4)
-
-            xValues = [9.75, 10.25, 10.75, 11.25]
+            # Plot the 4 sets of medians across 4 mass bins
+            xValues = np.array([9.75, 10.25, 10.75, 11.25])
             yValuesMQ = [medianMQbin1, medianMQbin2, medianMQbin3, medianMQbin4]
             yValuesMSF = [medianMSFbin1, medianMSFbin2, medianMSFbin3, medianMSFbin4]
             yValuesNMQ = [medianNMQbin1, medianNMQbin2, medianNMQbin3, medianNMQbin4]
             yValuesNMSF= [medianNMSFbin1, medianNMSFbin2, medianNMSFbin3, medianNMSFbin4]
-            plt.scatter(xValues, yValuesMQ, label='quiescent members')
-            plt.scatter(xValues, yValuesMSF, label='star-forming members')
-            plt.scatter(xValues, yValuesNMQ, label='quiescent non-members')
-            plt.scatter(xValues, yValuesNMSF, label='star-forming non-members')
+            offsetMQ = 0
+            offsetMSF = 0.03
+            offsetNMQ = -0.03
+            offsetNMSF = 0.06
+            plt.scatter(xValues + offsetMQ, yValuesMQ, label='quiescent members')
+            plt.scatter(xValues + offsetMSF, yValuesMSF, label='star-forming members')
+            plt.scatter(xValues + offsetNMQ, yValuesNMQ, label='quiescent non-members')
+            plt.scatter(xValues + offsetNMSF, yValuesNMSF, label='star-forming non-members')
             plt.legend()
-            
-            self.plotUncertainties(sizeMQbin1, medianMQbin1, 9.75, 'blue')
-            self.plotUncertainties(sizeMSFbin1, medianMSFbin1, 9.75, 'orange')
-            self.plotUncertainties(sizeNMQbin1, medianNMQbin1, 9.75, 'green')
-            self.plotUncertainties(sizeNMSFbin1, medianNMSFbin1, 9.75, 'red')
-            self.plotUncertainties(sizeMQbin2, medianMQbin2, 10.25, 'blue')
-            self.plotUncertainties(sizeMSFbin2, medianMSFbin1, 10.25, 'orange')
-            self.plotUncertainties(sizeNMQbin2, medianMQbin1, 10.25, 'green')
-            self.plotUncertainties(sizeNMSFbin2, medianNMSFbin2, 10.25, 'red')
-            self.plotUncertainties(sizeMQbin3, medianMQbin3, 10.75, 'blue')
-            self.plotUncertainties(sizeMSFbin3, medianMSFbin3, 10.75, 'orange')
-            self.plotUncertainties(sizeNMQbin3, medianNMQbin3, 10.75, 'green')
-            self.plotUncertainties(sizeNMSFbin3, medianNMSFbin3, 10.75, 'red')
-            self.plotUncertainties(sizeMQbin4, medianMQbin4, 11.25, 'blue')
-            self.plotUncertainties(sizeMSFbin4, medianMSFbin4, 11.25, 'orange')
-            self.plotUncertainties(sizeNMQbin4, medianNMQbin4, 11.25, 'green')
-            self.plotUncertainties(sizeNMSFbin4, medianNMSFbin4, 11.25, 'red')
-
-            if printError:
-                stdErrors = []
-                stdErrors.append(self.getStdError(sizeMQbin1))
-                stdErrors.append(self.getStdError(sizeMSFbin1))
-                stdErrors.append(self.getStdError(sizeNMQbin1))
-                stdErrors.append(self.getStdError(sizeNMSFbin1))
-                stdErrors.append(self.getStdError(sizeMQbin2))
-                stdErrors.append(self.getStdError(sizeMSFbin2))
-                stdErrors.append(self.getStdError(sizeNMQbin2))
-                stdErrors.append(self.getStdError(sizeNMSFbin2))
-                stdErrors.append(self.getStdError(sizeMQbin3))
-                stdErrors.append(self.getStdError(sizeMSFbin3))
-                stdErrors.append(self.getStdError(sizeNMQbin3))
-                stdErrors.append(self.getStdError(sizeNMSFbin3))
-                stdErrors.append(self.getStdError(sizeMQbin4))
-                stdErrors.append(self.getStdError(sizeMSFbin4))
-                stdErrors.append(self.getStdError(sizeNMQbin4))
-                stdErrors.append(self.getStdError(sizeNMSFbin4))
-                print(stdErrors)
+            # Plot uncertainty bars
+            self.plotUncertainties(sizeMQbin1, medianMQbin1, 9.75 + offsetMQ, 'blue')
+            self.plotUncertainties(sizeMSFbin1, medianMSFbin1, 9.75 + offsetMSF, 'orange')
+            self.plotUncertainties(sizeNMQbin1, medianNMQbin1, 9.75 + offsetNMQ, 'green')
+            self.plotUncertainties(sizeNMSFbin1, medianNMSFbin1, 9.75 + offsetNMSF, 'red')
+            self.plotUncertainties(sizeMQbin2, medianMQbin2, 10.25 + offsetMQ, 'blue')
+            self.plotUncertainties(sizeMSFbin2, medianMSFbin1, 10.25 + offsetMSF, 'orange')
+            self.plotUncertainties(sizeNMQbin2, medianMQbin1, 10.25 + offsetNMQ, 'green')
+            self.plotUncertainties(sizeNMSFbin2, medianNMSFbin2, 10.25 + offsetNMSF, 'red')
+            self.plotUncertainties(sizeMQbin3, medianMQbin3, 10.75 + offsetMQ, 'blue')
+            self.plotUncertainties(sizeMSFbin3, medianMSFbin3, 10.75 + offsetMSF, 'orange')
+            self.plotUncertainties(sizeNMQbin3, medianNMQbin3, 10.75 + offsetNMQ, 'green')
+            self.plotUncertainties(sizeNMSFbin3, medianNMSFbin3, 10.75 + offsetNMSF, 'red')
+            self.plotUncertainties(sizeMQbin4, medianMQbin4, 11.25 + offsetMQ, 'blue')
+            self.plotUncertainties(sizeMSFbin4, medianMSFbin4, 11.25 + offsetMSF, 'orange')
+            self.plotUncertainties(sizeNMQbin4, medianNMQbin4, 11.25 + offsetNMQ, 'green')
+            self.plotUncertainties(sizeNMSFbin4, medianNMSFbin4, 11.25 + offsetNMSF, 'red')
+            # Limit range of the plot to be the xRange and yRange parameters
             if xRange != None:
                 if len(xRange) > 1:
                     plt.xlim(xRange[0], xRange[1])
             if yRange != None:
                 if len(yRange) > 1:
                     plt.ylim(yRange[0], yRange[1])
+            # Label axes
             plt.xlabel('log(Mstellar)')
             plt.ylabel('log(Re)')
+            # Calculate standard error for each of the 16 medians if printError is true
+            if printError:
+                stdErrorsMQ = np.array([self.getStdError(sizeMQbin1), self.getStdError(sizeMQbin2), self.getStdError(sizeMQbin3), self.getStdError(sizeMQbin4)])
+                stdErrorsMSF = np.array([self.getStdError(sizeMSFbin1), self.getStdError(sizeMSFbin2), self.getStdError(sizeMSFbin3), self.getStdError(sizeMSFbin4)])
+                stdErrorsNMQ = np.array([self.getStdError(sizeNMQbin1), self.getStdError(sizeNMQbin2), self.getStdError(sizeNMQbin3), self.getStdError(sizeNMQbin4)])
+                stdErrorsNMSF = np.array([self.getStdError(sizeNMSFbin1), self.getStdError(sizeNMSFbin2), self.getStdError(sizeNMSFbin3), self.getStdError(sizeNMSFbin4)])
+                plt.errorbar(xValues + offsetMQ, stdErrorsMQ, ecolor='black', capsize=15, fmt='none')
+                plt.errorbar(xValues + offsetMSF, stdErrorsMSF, ecolor='black', capsize=15, fmt='none')
+                plt.errorbar(xValues + offsetNMQ, stdErrorsNMQ, ecolor='black', capsize=15, fmt='none')
+                plt.errorbar(xValues + offsetNMSF, stdErrorsNMSF, ecolor='black', capsize=15, fmt='none')
+                # NOTE: size (dy) of upper and lower error bar will be asymetric because it is LOG
     #END GETMEDIAN
 
     def getStdError(self, data:list=None) -> int:
@@ -671,24 +674,15 @@ class GOGREEN:
     #END GETSTDERROR
 
     def plotUncertainties(self, data:list=None, median:int=None, bin:int=None, color:str=None):
+        """
+        :param : filename - the name of the file to write to.
+        :return: writes slope and y-intercept of best fit lines of all, passive, and star forming galaxies in each cluster to the file 'output.txt' (better file type to be implemented in the future)
+        """
         confLower = np.percentile(data, 25)
         confHigher = np.percentile(data, 75)
-        confLower = np.log10(confLower)
-        confHigher = np.log10(confHigher)
-        x = [bin, bin]
-        yLower = [median - confLower, median + confLower]
-        yHigher = [median - confHigher, median + confHigher]
-        plt.plot(x, yLower, color=color)
-        plt.plot(x, yHigher,color=color)
-        xMark = [bin - 0.01, bin + 0.01]
-        yMarkLowerBot = [median - confLower, median - confLower]
-        yMarkLowerTop = [median + confLower, median + confLower]
-        yMarkHigherBot = [median - confHigher, median - confHigher]
-        yMarkHigherTop = [median + confHigher, median + confHigher]
-        plt.plot(xMark, yMarkLowerBot, color=color)
-        plt.plot(xMark, yMarkLowerTop, color=color)
-        plt.plot(xMark, yMarkHigherBot, color=color)
-        plt.plot(xMark, yMarkHigherTop, color=color)
+        plt.errorbar(bin, median, confHigher - median, barsabove=True, ecolor=color)
+        plt.errorbar(bin, median, median - confLower, barsabove=False, ecolor=color)
+
         
 
     #END PLOTUNCERTAINTY
