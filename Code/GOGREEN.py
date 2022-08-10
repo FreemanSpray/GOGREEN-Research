@@ -512,7 +512,7 @@ class GOGREEN:
             return [-1]
     #END GETRATIO
 
-    def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
+    def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None, printError:bool=False):
         """
         :param category:     Name of the category to consider when making comparisons
         :param xRange  :     List containing the desired lower and upper bounds for the x-axis
@@ -619,22 +619,43 @@ class GOGREEN:
             plt.scatter(xValues, yValuesNMQ, label='quiescent non-members')
             plt.scatter(xValues, yValuesNMSF, label='star-forming non-members')
             plt.legend()
-            self.plotUncertainties(sizeMQbin1, medianMQbin1, 9.75)
-            self.plotUncertainties(sizeMSFbin1, medianMSFbin1, 9.75)
-            self.plotUncertainties(sizeNMQbin1, medianNMQbin1, 9.75)
-            self.plotUncertainties(sizeNMSFbin1, medianNMSFbin1, 9.75)
-            self.plotUncertainties(sizeMQbin2, medianMQbin2, 10.25)
-            self.plotUncertainties(sizeMSFbin2, medianMSFbin1, 10.25)
-            self.plotUncertainties(sizeNMQbin2, medianMQbin1, 10.25)
-            self.plotUncertainties(sizeNMSFbin2, medianNMSFbin2, 10.25)
-            self.plotUncertainties(sizeMQbin3, medianMQbin3, 10.75)
-            self.plotUncertainties(sizeMSFbin3, medianMSFbin3, 10.75)
-            self.plotUncertainties(sizeNMQbin3, medianNMQbin3, 10.75)
-            self.plotUncertainties(sizeNMSFbin3, medianNMSFbin3, 10.75)
-            self.plotUncertainties(sizeMQbin4, medianMQbin4, 11.25)
-            self.plotUncertainties(sizeMSFbin4, medianMSFbin4, 11.25)
-            self.plotUncertainties(sizeNMQbin4, medianNMQbin4, 11.25)
-            self.plotUncertainties(sizeNMSFbin4, medianNMSFbin4, 11.25)
+            
+            self.plotUncertainties(sizeMQbin1, medianMQbin1, 9.75, 'blue')
+            self.plotUncertainties(sizeMSFbin1, medianMSFbin1, 9.75, 'orange')
+            self.plotUncertainties(sizeNMQbin1, medianNMQbin1, 9.75, 'green')
+            self.plotUncertainties(sizeNMSFbin1, medianNMSFbin1, 9.75, 'red')
+            self.plotUncertainties(sizeMQbin2, medianMQbin2, 10.25, 'blue')
+            self.plotUncertainties(sizeMSFbin2, medianMSFbin1, 10.25, 'orange')
+            self.plotUncertainties(sizeNMQbin2, medianMQbin1, 10.25, 'green')
+            self.plotUncertainties(sizeNMSFbin2, medianNMSFbin2, 10.25, 'red')
+            self.plotUncertainties(sizeMQbin3, medianMQbin3, 10.75, 'blue')
+            self.plotUncertainties(sizeMSFbin3, medianMSFbin3, 10.75, 'orange')
+            self.plotUncertainties(sizeNMQbin3, medianNMQbin3, 10.75, 'green')
+            self.plotUncertainties(sizeNMSFbin3, medianNMSFbin3, 10.75, 'red')
+            self.plotUncertainties(sizeMQbin4, medianMQbin4, 11.25, 'blue')
+            self.plotUncertainties(sizeMSFbin4, medianMSFbin4, 11.25, 'orange')
+            self.plotUncertainties(sizeNMQbin4, medianNMQbin4, 11.25, 'green')
+            self.plotUncertainties(sizeNMSFbin4, medianNMSFbin4, 11.25, 'red')
+
+            if printError:
+                stdErrors = []
+                stdErrors.append(self.getStdError(sizeMQbin1))
+                stdErrors.append(self.getStdError(sizeMSFbin1))
+                stdErrors.append(self.getStdError(sizeNMQbin1))
+                stdErrors.append(self.getStdError(sizeNMSFbin1))
+                stdErrors.append(self.getStdError(sizeMQbin2))
+                stdErrors.append(self.getStdError(sizeMSFbin2))
+                stdErrors.append(self.getStdError(sizeNMQbin2))
+                stdErrors.append(self.getStdError(sizeNMSFbin2))
+                stdErrors.append(self.getStdError(sizeMQbin3))
+                stdErrors.append(self.getStdError(sizeMSFbin3))
+                stdErrors.append(self.getStdError(sizeNMQbin3))
+                stdErrors.append(self.getStdError(sizeNMSFbin3))
+                stdErrors.append(self.getStdError(sizeMQbin4))
+                stdErrors.append(self.getStdError(sizeMSFbin4))
+                stdErrors.append(self.getStdError(sizeNMQbin4))
+                stdErrors.append(self.getStdError(sizeNMSFbin4))
+                print(stdErrors)
             if xRange != None:
                 if len(xRange) > 1:
                     plt.xlim(xRange[0], xRange[1])
@@ -645,13 +666,32 @@ class GOGREEN:
             plt.ylabel('log(Re)')
     #END GETMEDIAN
 
-    def plotUncertainties(self, data:list=None, median:int=None, bin:int=None):
-        unLeft = np.percentile(data, 25)
-        unRight = np.percentile(data, 75)
+    def getStdError(self, data:list=None) -> int:
+        return 1.253 * (np.std(data)/np.sqrt(len(data)))
+    #END GETSTDERROR
+
+    def plotUncertainties(self, data:list=None, median:int=None, bin:int=None, color:str=None):
+        confLower = np.percentile(data, 25)
+        confHigher = np.percentile(data, 75)
+        confLower = np.log10(confLower)
+        confHigher = np.log10(confHigher)
         x = [bin, bin]
-        y = [median - unRight, median + unRight]
-        plt.plot(x, y)
-    #END GETUNCERTAINTY
+        yLower = [median - confLower, median + confLower]
+        yHigher = [median - confHigher, median + confHigher]
+        plt.plot(x, yLower, color=color)
+        plt.plot(x, yHigher,color=color)
+        xMark = [bin - 0.01, bin + 0.01]
+        yMarkLowerBot = [median - confLower, median - confLower]
+        yMarkLowerTop = [median + confLower, median + confLower]
+        yMarkHigherBot = [median - confHigher, median - confHigher]
+        yMarkHigherTop = [median + confHigher, median + confHigher]
+        plt.plot(xMark, yMarkLowerBot, color=color)
+        plt.plot(xMark, yMarkLowerTop, color=color)
+        plt.plot(xMark, yMarkHigherBot, color=color)
+        plt.plot(xMark, yMarkHigherTop, color=color)
+        
+
+    #END PLOTUNCERTAINTY
 
     def makeTable(self, filename):
         """
