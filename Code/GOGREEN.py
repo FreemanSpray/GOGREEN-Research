@@ -268,9 +268,11 @@ class GOGREEN:
         if row != None and col != None:
             if axes[row][col] != None:
                 axes[row][col].plot(Re, logA + (alpha * np.log(Mstellar / (5 * np.power(10, 10)))), linestyle='dashed', color='black')
+                print("got lines")
                 return
         # Else plot normally
         plt.plot(Re, logA + (alpha * np.log(Mstellar / (5 * np.power(10, 10)))), linestyle='dashed', color='black')
+        print("got lines")
     #END PLOTVANDERWELLINES
 
     def reConvert(self, data:list) -> list:
@@ -619,12 +621,11 @@ class GOGREEN:
                 stdErrorsMSF = np.array([self.getStdError(i) for i in sizeMSF])
                 stdErrorsNMQ = np.array([self.getStdError(i) for i in sizeNMQ])
                 stdErrorsNMSF = np.array([self.getStdError(i) for i in sizeNMSF])
-                # NOTE: standard error bars do not work at present
                 for i in range(0, len(xValues)):
-                    plt.errorbar(xValues[i] + offsetMQ, stdErrorsMQ[i], ecolor='black', capsize=150, fmt='none')
-                    plt.errorbar(xValues[i] + offsetMSF, stdErrorsMSF[i], ecolor='black', capsize=150, fmt='none')
-                    plt.errorbar(xValues[i] + offsetNMQ, stdErrorsNMQ[i], ecolor='black', capsize=150, fmt='none')
-                    plt.errorbar(xValues[i] + offsetNMSF, stdErrorsNMSF[i], ecolor='black', capsize=150, fmt='none')
+                    self.plotStdError(medianMQ[i], xValues[i] + offsetMQ, stdErrorsMQ[i], 'black')
+                    self.plotStdError(medianMSF[i], xValues[i] + offsetMSF, stdErrorsMSF[i], 'black')
+                    self.plotStdError(medianNMQ[i], xValues[i] + offsetNMQ, stdErrorsNMQ[i], 'black')
+                    self.plotStdError(medianNMSF[i], xValues[i] + offsetNMSF, stdErrorsNMSF[i], 'black')
                 # NOTE: size (dy) of upper and lower error bar will be asymetric because it is LOG
     #END GETMEDIAN
 
@@ -632,18 +633,16 @@ class GOGREEN:
         return 1.253 * (np.std(data)/np.sqrt(len(data)))
     #END GETSTDERROR
 
+    def plotStdError(self, median:int=None, bin:int=None, stdError:int=None, color:str=None):
+        plt.errorbar(bin, median, stdError, barsabove = True, ecolor=color)
+        plt.errorbar(bin, median, stdError, barsabove = False, ecolor=color)
+    #END PLOTSTDERROR
+
     def plotUncertainties(self, data:list=None, median:int=None, bin:int=None, color:str=None):
-        """
-        :param : filename - the name of the file to write to.
-        :return: writes slope and y-intercept of best fit lines of all, passive, and star forming galaxies in each cluster to the file 'output.txt' (better file type to be implemented in the future)
-        """
         confLower = np.percentile(data, 25)
         confHigher = np.percentile(data, 75)
         plt.errorbar(bin, median, confHigher - median, barsabove=True, ecolor=color)
         plt.errorbar(bin, median, median - confLower, barsabove=False, ecolor=color)
-
-        
-
     #END PLOTUNCERTAINTY
 
     def makeTable(self, filename):
