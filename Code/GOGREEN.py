@@ -262,17 +262,17 @@ class GOGREEN:
         # Generate the data used to plot the line
         logA = 0.7
         alpha = 0.22
-        Mstellar = np.array([3162280000, 316228000000])
+        Mstellar = np.array([31622800000000000000000000, 3162280000000000000000000000])
         Re = np.array([-1.5, 1.5])
+        xValues = np.array([alpha * np.log(i / (5 * np.float_power(10, 10))) for i in Mstellar])
+        print(xValues)
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None:
-                axes[row][col].plot(Re, logA + (alpha * np.log(Mstellar / (5 * np.power(10, 10)))), linestyle='dashed', color='black')
-                print("got lines")
+                axes[row][col].plot(xValues, Re, linestyle='dashed', color='black')
                 return
         # Else plot normally
-        plt.plot(Re, logA + (alpha * np.log(Mstellar / (5 * np.power(10, 10)))), linestyle='dashed', color='black')
-        print("got lines")
+        plt.plot(xValues, Re, linestyle='dashed', color='black')
     #END PLOTVANDERWELLINES
 
     def reConvert(self, data:list) -> list:
