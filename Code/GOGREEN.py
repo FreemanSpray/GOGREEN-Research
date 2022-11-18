@@ -9,12 +9,7 @@ import random as rng
 import os
 
 
-"""
-Freeman's to-do:
-1. Improve file format used by makeTable()
-2. draw the quiescent border line in 'passive' colorType plots.
-3. Manage fit-line color to be more helpful
-"""
+
 class GOGREEN:
     def __init__(self, dataPath:str):
         """
@@ -285,6 +280,9 @@ class GOGREEN:
         :return   :    returns the list of converted effective radius values
 
         """
+        #if data['re'].values.any() == False:
+        #    sizes = []
+        #else: 
         sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
         for i in range(0, len(sizes)):
             if np.isnan(sizes[i]) == True: #checking where conversion failed due to lack of zspec value
@@ -712,7 +710,7 @@ class GOGREEN:
     # END MAKETABLE
 
     def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None,
-             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False):
+             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -800,8 +798,12 @@ class GOGREEN:
                 if fitLine == True:
                     self.MSRfit(data, useLog)
                 # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    self.plotVanDerWelLines()
+                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                    #self.plotVanDerWelLines()
+                if test:
+                    x = xData.shape[0]
+                    y = yData.shape[0]
+                    print((x, y))
             elif colorType == 'membership':
                 # Extract desired quantities from data
                 specZ = data[~data['zspec'].isna()]
@@ -832,8 +834,14 @@ class GOGREEN:
                 if fitLine == True:
                     self.MSRfit(data, useLog)
                 # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    self.plotVanDerWelLines()
+                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                    #self.plotVanDerWelLines()
+                if test:
+                    xSpec = photXData.shape[0]
+                    ySpec = photYData.shape[0]
+                    xPhot = photXData.shape[0]
+                    yPhot = photYData.shape[0]
+                    print((xSpec + xPhot, ySpec + yPhot))
             elif colorType == 'passive':
                 # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                 passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
@@ -871,8 +879,14 @@ class GOGREEN:
                 if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                     self.plotPassiveLines()
                 # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    self.plotVanDerWelLines()
+                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                    #self.plotVanDerWelLines()
+                if test:
+                    xPassive = passiveX.shape[0]
+                    yPassive = passiveY.shape[0]
+                    xSF = starFormingX.shape[0]
+                    ySF = starFormingY.shape[0]
+                    print((xPassive + yPassive, xSF + ySF))
             elif colorType == 'sersic':
                 elliptical = data.query('2.5 < n < 6')
                 spiral = data.query('n < 2.5')
@@ -902,8 +916,14 @@ class GOGREEN:
                     self.MSRfit(elliptical, useLog, color=color1)
                     self.MSRfit(spiral, useLog, color=color2)
                 # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    self.plotVanDerWelLines()
+                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                    #self.plotVanDerWelLines()
+                if test:
+                    xElliptical = ellipticalX.shape[0]
+                    yElliptical = ellipticalY.shape[0]
+                    xSpiral = spiralX.shape[0]
+                    ySpiral = spiralY.shape[0]
+                    print((xElliptical + yElliptical, xSpiral + ySpiral))
             else:
                 print(colorType, ' is not a valid coloring scheme!')
 
@@ -912,6 +932,11 @@ class GOGREEN:
             # Generate the subplots
             _, axes = plt.subplots(4,3,figsize=(15,12))
             currentIndex = 0
+            if test:
+                xA = 0
+                xB = 0
+                yA = 0
+                yB = 0
             # Loop over each subplot
             for i in range(4):
                 for j in range(3):
@@ -950,8 +975,11 @@ class GOGREEN:
                         if fitLine == True:
                             self.MSRfit(data, useLog, axes, i, j)
                         # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            self.plotVanDerWelLines(axes, i, j)
+                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                            #self.plotVanDerWelLines(axes, i, j)
+                        if test:
+                            xA = xA + xData.shape[0]
+                            yA = yA + yData.shape[0]
                     elif colorType == 'membership':
                         # Extract desired quantities from data
                         specZ = data[~data['zspec'].isna()]
@@ -982,8 +1010,13 @@ class GOGREEN:
                         if fitLine == True:
                             self.MSRfit(data, useLog, axes, i, j)
                         # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            self.plotVanDerWelLines(axes, i, j)
+                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                           # self.plotVanDerWelLines(axes, i, j)
+                        if test:
+                            xA = xA + specXData.shape[0]
+                            yA = yA + specYData.shape[0]
+                            xB = xB + photXData.shape[0]
+                            yB = yB + photYData.shape[0]
                     elif colorType == 'passive':
                         # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                         passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
@@ -1021,8 +1054,13 @@ class GOGREEN:
                         if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                             self.plotPassiveLines(axes, i, j)
                         # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            self.plotVanDerWelLines(axes, i, j)
+                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                            #self.plotVanDerWelLines(axes, i, j)
+                        if test:
+                            xA = xA + passiveX.shape[0]
+                            yA = yA + passiveY.shape[0]
+                            xB = xB + starFormingX.shape[0]
+                            yB = yB + starFormingY.shape[0]
                     elif colorType == 'sersic':
                         elliptical = data.query('2.5 < n < 6')
                         spiral = data.query('n < 2.5')
@@ -1052,8 +1090,13 @@ class GOGREEN:
                             self.MSRfit(elliptical, useLog, axes, i, j, color=color1)
                             self.MSRfit(spiral, useLog, axes, i, j, color=color2)
                         # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            self.plotVanDerWelLines(axes, i, j)
+                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                            #self.plotVanDerWelLines(axes, i, j)
+                        if test:
+                            xA = xA + ellipticalX.shape[0]
+                            yA = yA + ellipticalY.shape[0]
+                            xB = xB + spiralX.shape[0]
+                            yB = yB + spiralY.shape[0]
                     else:
                         print(colorType, ' is not a valid coloring scheme!')
 
@@ -1072,10 +1115,17 @@ class GOGREEN:
             # These specifc values were found at:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
+            if test:
+                print(xA + xB, yA + yB)
 
         # Plot all clusters on the same plot            
         elif plotType == 3:
             # Loop over every cluster
+            if test:
+                xA = 0
+                xB = 0
+                yA = 0
+                yB = 0
             for clusterName in self._structClusterNames:
                 # Get all galaxies associated with this cluster
                 data = self.getClusterGalaxies(clusterName)
@@ -1104,6 +1154,9 @@ class GOGREEN:
                         yData = np.log10(yData)
                     # Generate the plot
                     plt.scatter(xData, yData, c=color1)
+                    if test:
+                        xA = xA + xData.shape[0]
+                        yA = yA + yData.shape[0]
                 elif colorType == 'membership':
                     specZ = data[~data['zspec'].isna()]
                     # Assume photZ are those that do not have a specZ
@@ -1133,6 +1186,11 @@ class GOGREEN:
                     else:
                         plt.scatter(specXData, specYData, color=color1, label='Spectroscopic z')
                         plt.scatter(photXData, photYData, color=color2, label='Photometric z')
+                    if test:
+                        xA = xA + specXData.shape[0]
+                        yA = yA + specYData.shape[0]
+                        xB = xB + photXData.shape[0]
+                        yB = yB + photYData.shape[0]
                 elif colorType == 'passive':
                     # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                     passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
@@ -1170,6 +1228,11 @@ class GOGREEN:
                         # Plot passive v star-forming border in the case where we are plotting UVJ color-color
                         if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                             self.plotPassiveLines()
+                    if test:
+                        xA = xA + passiveX.shape[0]
+                        yA = yA + passiveY.shape[0]
+                        xB = xB + starFormingX.shape[0]
+                        yB = yB + starFormingY.shape[0]
                 elif colorType == 'sersic':
                     elliptical = data.query('2.5 < n < 6')
                     spiral = data.query('n < 2.5')
@@ -1199,6 +1262,11 @@ class GOGREEN:
                     else:
                         plt.scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
                         plt.scatter(spiralX, spiralY, color=color2, label='n < 2.5')
+                    if test:
+                        xA = xA + ellipticalX.shape[0]
+                        yA = yA + ellipticalY.shape[0]
+                        xB = xB + spiralX.shape[0]
+                        yB = yB + spiralY.shape[0]
                 else:
                     print(colorType, ' is not a valid coloring scheme!')
                     # Return since in the case of plot type 3 it is possible for the remainder of the code to execute otherwise
@@ -1216,8 +1284,10 @@ class GOGREEN:
                 else:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards)
             # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-            if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                self.plotVanDerWelLines()
+            #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                #self.plotVanDerWelLines()
+            if test:
+                print(xA + xB, yA + yB)
         else:
             print(plotType, " is not a valid plotting scheme!")
 
