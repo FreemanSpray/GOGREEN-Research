@@ -837,8 +837,8 @@ class GOGREEN:
                 #if xQuantityName == 'Mstellar' and yQuantityName == 're':
                     #self.plotVanDerWelLines()
                 if test:
-                    xSpec = photXData.shape[0]
-                    ySpec = photYData.shape[0]
+                    xSpec = specXData.shape[0]
+                    ySpec = specYData.shape[0]
                     xPhot = photXData.shape[0]
                     yPhot = photYData.shape[0]
                     print((xSpec + xPhot, ySpec + yPhot))
@@ -846,10 +846,15 @@ class GOGREEN:
                 # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                 passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
                 # Build active query string, limiting mass to > 10^9.5
-                starFormingQuery = '(UMINV <= 1.3) and (VMINJ <= 1.6) and (UMINV <= 0.60+VMINJ) and Mstellar > 3162280000'
+                starFormingQuery = '((UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)) and Mstellar > 3162280000'
                 # Extract desired quantities from data
                 passive = data.query(passiveQuery)
                 starForming = data.query(starFormingQuery)
+                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                # With the Mstellar restrictions set above this does not actually make a difference, but we need to be aware of this if we ever change those restrictions.
+                passive = self.reduceDF(passive, additionalCriteria, useStandards)
+                starForming = self.reduceDF(starForming, additionalCriteria, useStandards)
+                # Continue extracting desired quantities
                 passiveX = passive[xQuantityName].values
                 passiveY = passive[yQuantityName].values
                 starFormingX = starForming[xQuantityName].values
@@ -886,7 +891,7 @@ class GOGREEN:
                     yPassive = passiveY.shape[0]
                     xSF = starFormingX.shape[0]
                     ySF = starFormingY.shape[0]
-                    print((xPassive + yPassive, xSF + ySF))
+                    print((xPassive + xSF, yPassive + ySF))
             elif colorType == 'sersic':
                 elliptical = data.query('2.5 < n < 6')
                 spiral = data.query('n < 2.5')
@@ -923,7 +928,7 @@ class GOGREEN:
                     yElliptical = ellipticalY.shape[0]
                     xSpiral = spiralX.shape[0]
                     ySpiral = spiralY.shape[0]
-                    print((xElliptical + yElliptical, xSpiral + ySpiral))
+                    print((xElliptical + xSpiral, yElliptical + ySpiral))
             else:
                 print(colorType, ' is not a valid coloring scheme!')
 
@@ -1021,10 +1026,15 @@ class GOGREEN:
                         # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                         passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
                         # Build active query string, limiting mass to > 10^9.5
-                        starFormingQuery = '(UMINV <= 1.3) and (VMINJ <= 1.6) and (UMINV <= 0.60+VMINJ) and Mstellar > 3162280000'
+                        starFormingQuery = '((UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)) and Mstellar > 3162280000'
                         # Extract desired quantities from data
                         passive = data.query(passiveQuery)
                         starForming = data.query(starFormingQuery)
+                        # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                        # With the Mstellar restrictions set above this does not actually make a difference, but we need to be aware of this if we ever change those restrictions.
+                        passive = self.reduceDF(passive, additionalCriteria, useStandards)
+                        starForming = self.reduceDF(starForming, additionalCriteria, useStandards)
+                        # Continue extracting desired quantities
                         passiveX = passive[xQuantityName].values
                         passiveY = passive[yQuantityName].values
                         starFormingX = starForming[xQuantityName].values
@@ -1195,10 +1205,15 @@ class GOGREEN:
                     # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                     passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
                     # Build active query string, limiting mass to > 10^9.5
-                    starFormingQuery = '(UMINV <= 1.3) and (VMINJ <= 1.6) and (UMINV <= 0.60+VMINJ) and Mstellar > 3162280000'
+                    starFormingQuery = '((UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)) and Mstellar > 3162280000'
                     # Extract desired quantities from data
                     passive = data.query(passiveQuery)
                     starForming = data.query(starFormingQuery)
+                    # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                    # With the Mstellar restrictions set above this does not actually make a difference, but we need to be aware of this if we ever change those restrictions.
+                    passive = self.reduceDF(passive, additionalCriteria, useStandards)
+                    starForming = self.reduceDF(starForming, additionalCriteria, useStandards)
+                    # Continue extracting desired quantities
                     passiveX = passive[xQuantityName].values
                     passiveY = passive[yQuantityName].values
                     starFormingX = starForming[xQuantityName].values
