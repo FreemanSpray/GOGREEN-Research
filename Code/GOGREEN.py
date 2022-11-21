@@ -173,20 +173,10 @@ class GOGREEN:
         :param clusterName: Name of the cluster whose non-members should be returned
         :return:            Pandas DataFrame containing the galaxies whose redshift match the membership requirements
         """
-        clusterZ = self.getClusterZ(clusterName)
         allClusterGalaxies = self.getClusterGalaxies(clusterName)
-        # Find spectroscopic and photometric non-members seperately
-        # Spectrosocpic criteria: (zspec-zclust) >= 0.02(1+zspec)
-        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) >= 0.02*(1+allClusterGalaxies['zspec'].values)
-        specZgalaxies = allClusterGalaxies[specZthreshold]
-        # Photometric criteria: (zphot-zclust) >= 0.08(1+zphot)
-        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) >= 0.08*(1+allClusterGalaxies['zphot'].values)
-        photZgalaxies = allClusterGalaxies[photZthreshold]
-        # Remove photZgalaxies with a specZ
-        photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
-        # Combine into a single DataFrame
-        memberGalaxies = specZgalaxies.append(photZgalaxies)
-        return memberGalaxies
+        memberGalaxies = self.getMembers(clusterName)
+        nonMemberGalaxies = allClusterGalaxies[~allClusterGalaxies['cPHOTID'].isin(memberGalaxies['cPHOTID'])]
+        return nonMemberGalaxies
     # END GETNONMEMBERS
 
     def reduceDF(self, frame:pd.DataFrame, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
