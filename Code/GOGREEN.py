@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import random as rng
 import os
+import warnings
 
 
 
@@ -699,8 +700,31 @@ class GOGREEN:
         f.write(str(b) + ' ')    
     # END MAKETABLE
 
+    def testPlots(self):
+        searchCriteria = [
+            'Star == 0',
+            'K_flag == 0',
+            'totmask == 0',
+            're > 0',
+            'Mstellar > 6300000000',
+            'Fit_flag > 1',
+            'n < 6',
+            'HSTFOV_flag == 1',
+            '(1 < zspec < 1.5) or ((Redshift_Quality != 3) and (Redshift_Quality != 4) and (1 < zphot < 1.5))'
+        ]
+        self.standardCriteria = searchCriteria
+
+        with warnings.catch_warnings(): #suppressing depracation warnings for readability purposes
+            warnings.simplefilter("ignore")
+            warnings.warn("deprecated", DeprecationWarning)
+            
+            f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'w')
+            self.plot('Mstellar', 're', 1, clusterName="SpARCS1616", useMembers="all", useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=True, test=True, file=f)
+            f.close()
+    # END TEST
+
     def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None,
-             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False):
+             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False, file:__file__=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -793,7 +817,7 @@ class GOGREEN:
                 if test:
                     x = xData.shape[0]
                     y = yData.shape[0]
-                    print((x, y))
+                    file.write(str((x, y)) + ' ')
             elif colorType == 'membership':
                 # Extract desired quantities from data
                 specZ = data[~data['zspec'].isna()]
@@ -834,9 +858,9 @@ class GOGREEN:
                     print((xSpec + xPhot, ySpec + yPhot))
             elif colorType == 'passive':
                 # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
-                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
+                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
                 # Build active query string, limiting mass to > 10^9.5
-                starFormingQuery = '((UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)) and Mstellar > 3162280000'
+                starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
                 # Extract desired quantities from data
                 passive = data.query(passiveQuery)
                 starForming = data.query(starFormingQuery)
@@ -1014,9 +1038,9 @@ class GOGREEN:
                             yB = yB + photYData.shape[0]
                     elif colorType == 'passive':
                         # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
-                        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
+                        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
                         # Build active query string, limiting mass to > 10^9.5
-                        starFormingQuery = '((UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)) and Mstellar > 3162280000'
+                        starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
                         # Extract desired quantities from data
                         passive = data.query(passiveQuery)
                         starForming = data.query(starFormingQuery)
@@ -1193,9 +1217,9 @@ class GOGREEN:
                         yB = yB + photYData.shape[0]
                 elif colorType == 'passive':
                     # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
-                    passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ) and Mstellar > 5011870000'
+                    passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
                     # Build active query string, limiting mass to > 10^9.5
-                    starFormingQuery = '((UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)) and Mstellar > 3162280000'
+                    starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
                     # Extract desired quantities from data
                     passive = data.query(passiveQuery)
                     starForming = data.query(starFormingQuery)
