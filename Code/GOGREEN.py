@@ -176,11 +176,11 @@ class GOGREEN:
         clusterZ = self.getClusterZ(clusterName)
         allClusterGalaxies = self.getClusterGalaxies(clusterName)
         # Find spectroscopic and photometric non-members seperately
-        # Spectrosocpic criteria: (zspec-zclust) > 0.02(1+zspec)
-        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) > 0.02*(1+allClusterGalaxies['zspec'].values)
+        # Spectrosocpic criteria: (zspec-zclust) >= 0.02(1+zspec)
+        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) >= 0.02*(1+allClusterGalaxies['zspec'].values)
         specZgalaxies = allClusterGalaxies[specZthreshold]
-        # Photometric criteria: (zphot-zclust) > 0.08(1+zphot)
-        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) > 0.08*(1+allClusterGalaxies['zphot'].values)
+        # Photometric criteria: (zphot-zclust) >= 0.08(1+zphot)
+        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) >= 0.08*(1+allClusterGalaxies['zphot'].values)
         photZgalaxies = allClusterGalaxies[photZthreshold]
         # Remove photZgalaxies with a specZ
         photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
