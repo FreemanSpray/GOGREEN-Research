@@ -731,6 +731,16 @@ class GOGREEN:
                         self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False, test=True, file=f)
                         self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False, test=True, file=f)
             f.close()
+            f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'r')
+            testOutput = f.read()
+            f.close()
+            f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/truth.txt', 'r')
+            expectedOutput = f.read()
+            f.close()
+            if testOutput == expectedOutput:
+                print("test passed.")
+                return
+            print("test failed.")
     # END TEST
 
     def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None,
