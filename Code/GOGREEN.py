@@ -271,9 +271,9 @@ class GOGREEN:
         :return   :    returns the list of converted effective radius values
 
         """
-        #if data['re'].values.any() == False:
-        #    sizes = []
-        #else: 
+        if data['re'].values.shape == (0,):
+            # If there are no values, return empty array so attempting to convert does not cause a crash
+            return []
         sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
         for i in range(0, len(sizes)):
             if np.isnan(sizes[i]) == True: #checking where conversion failed due to lack of zspec value
@@ -719,7 +719,17 @@ class GOGREEN:
             warnings.warn("deprecated", DeprecationWarning)
             
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'w')
-            self.plot('Mstellar', 're', 1, clusterName="SpARCS1616", useMembers="all", useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=True, test=True, file=f)
+            memberStatus = ["all", "only", "not"]
+            plotType = [1, 2, 3]
+            colorType = [None, "membership", "passive", "sersic"]
+            cluster = None
+            for m in memberStatus:
+                for p in plotType:
+                    for c in colorType:
+                        if p == 1:
+                            cluster = "SpARCS1616"
+                        self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False, test=True, file=f)
+                        self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False, test=True, file=f)
             f.close()
     # END TEST
 
@@ -817,7 +827,7 @@ class GOGREEN:
                 if test:
                     x = xData.shape[0]
                     y = yData.shape[0]
-                    file.write(str((x, y)) + ' ')
+                    file.write(str(x) +  ' ' + str(y) + ' ')
             elif colorType == 'membership':
                 # Extract desired quantities from data
                 specZ = data[~data['zspec'].isna()]
@@ -855,7 +865,7 @@ class GOGREEN:
                     ySpec = specYData.shape[0]
                     xPhot = photXData.shape[0]
                     yPhot = photYData.shape[0]
-                    print((xSpec + xPhot, ySpec + yPhot))
+                    file.write(str(xSpec + xPhot) +  ' ' + str(ySpec + yPhot) + ' ')
             elif colorType == 'passive':
                 # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
                 passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
@@ -905,7 +915,7 @@ class GOGREEN:
                     yPassive = passiveY.shape[0]
                     xSF = starFormingX.shape[0]
                     ySF = starFormingY.shape[0]
-                    print((xPassive + xSF, yPassive + ySF))
+                    file.write(str(xPassive + xSF) +  ' ' + str(yPassive + ySF) + ' ')
             elif colorType == 'sersic':
                 elliptical = data.query('2.5 < n < 6')
                 spiral = data.query('n < 2.5')
@@ -942,7 +952,7 @@ class GOGREEN:
                     yElliptical = ellipticalY.shape[0]
                     xSpiral = spiralX.shape[0]
                     ySpiral = spiralY.shape[0]
-                    print((xElliptical + xSpiral, yElliptical + ySpiral))
+                    file.write(str(xElliptical + xSpiral) +  ' ' + str(yElliptical + ySpiral) + ' ')
             else:
                 print(colorType, ' is not a valid coloring scheme!')
 
@@ -1140,7 +1150,7 @@ class GOGREEN:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
             if test:
-                print(xA + xB, yA + yB)
+                file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
 
         # Plot all clusters on the same plot            
         elif plotType == 3:
@@ -1316,7 +1326,7 @@ class GOGREEN:
             #if xQuantityName == 'Mstellar' and yQuantityName == 're':
                 #self.plotVanDerWelLines()
             if test:
-                print(xA + xB, yA + yB)
+                file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
         else:
             print(plotType, " is not a valid plotting scheme!")
 
