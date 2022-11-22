@@ -349,12 +349,16 @@ class GOGREEN:
             # Handling case where only star forming galaxies out of all data need to plotted.
             if typeRestrict == 'spiral':
                 data = data.query('n < 2.5')
+        # Remove data points that would cause an error (because nan cases in Mstellar are not caught by standard criteria)
+        print(data['Mstellar'].values)
+        print(data.shape)
+        data = self.cutBadData(data)
+        print(data['Mstellar'].values)
+        print(data.shape)
         # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
         size = self.reConvert(data)
         # Extract mass values
         mass = data['Mstellar'].values
-        # Remove data points that would cause an error
-        mass, size = self.cutBadData(mass, size)
 
         xFitData = mass
         yFitData = size
@@ -363,6 +367,7 @@ class GOGREEN:
         if useLog[1] == True:
             yFitData = np.log10(yFitData)
         m, b = np.polyfit(xFitData, yFitData, 1) #slope and intercept for best fit line
+        #m1, b1 = np.polynomial.polynomial.Polynomial.fit(xFitData, yFitData, 1)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -379,7 +384,7 @@ class GOGREEN:
         plt.plot(xFitData, m * xFitData + b, color=color)
     # END MSRFIT
 
-    def cutBadData(self, masses:list=None, sizes:list=None) -> list:
+    def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
         """
         cutBadData removes all data points from a data set for which the mass value is missing
         
@@ -390,19 +395,15 @@ class GOGREEN:
         :return: masses and sizes are returned minus the bad data points
         """
         badDataIndices = []
-        for i in range(0, len(masses)):
+        for i in range(0, len(data['Mstellar'])):
             # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
-            if np.isnan(masses[i]) == True:
+            if np.isnan(data['Mstellar'].values[i]) == True:
                 # Add the index of this data point to the list of those to be removed once all data points have been checked.
                 badDataIndices.append(i)
-        for j in range(0, len(badDataIndices)):
+        for j in range(len(badDataIndices) - 1, -1, -1):
             # Iterate through the array of indices, removing the data at these indices from both axis arrays.
-            masses = np.delete(masses, badDataIndices[j])
-            sizes = np.delete(sizes, badDataIndices[j])
-            # Adjust badDataIndices to account for reduced count of all further recorded indices
-            for k in range(0, len(badDataIndices)):
-                badDataIndices[k] = badDataIndices[k] - 1
-        return masses, sizes
+            data = pd.concat([data[:badDataIndices[j]], data[badDataIndices[j]+1:]]) 
+        return data
 
     def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
         """
