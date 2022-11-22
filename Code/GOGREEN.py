@@ -350,16 +350,14 @@ class GOGREEN:
             if typeRestrict == 'spiral':
                 data = data.query('n < 2.5')
         # Remove data points that would cause an error (because nan cases in Mstellar are not caught by standard criteria)
-        print(data['Mstellar'].values)
-        print(data.shape)
         data = self.cutBadData(data)
-        print(data['Mstellar'].values)
-        print(data.shape)
         # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
         size = self.reConvert(data)
         # Extract mass values
         mass = data['Mstellar'].values
-
+        # Extract error values and transform into weights
+        weights = 1/data['re_err'].values
+        # Calculate coefficients (slope and y-intercept)
         xFitData = mass
         yFitData = size
         if useLog[0] == True:
@@ -367,7 +365,8 @@ class GOGREEN:
         if useLog[1] == True:
             yFitData = np.log10(yFitData)
         m, b = np.polyfit(xFitData, yFitData, 1) #slope and intercept for best fit line
-        #m1, b1 = np.polynomial.polynomial.Polynomial.fit(xFitData, yFitData, 1)
+        m1, b1 = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
+        print((m,b,m1,b1))
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -376,6 +375,7 @@ class GOGREEN:
                     axes[row][col].plot(xFitData, m * xFitData + b, color='white', linewidth=4)
                 # Plot the best fit line
                 axes[row][col].plot(xFitData, m * xFitData + b, color=color)
+                axes[row][col].plot(xFitData, m1 * xFitData + b1, color='red')
                 return
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
