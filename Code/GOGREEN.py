@@ -273,7 +273,7 @@ class GOGREEN:
         """
         if data['re'].values.shape == (0,):
             # If there are no values, return empty array so attempting to convert does not cause a crash
-            return []
+            return [], []
         sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
         sigmas = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
         for i in range(0, len(sizes)):
