@@ -279,9 +279,16 @@ class GOGREEN:
         for i in range(0, len(sizes)):
             if np.isnan(sizes[i]): #checking where conversion failed due to lack of zspec value
                 sizes[i] = data['re'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
+        for i in range(0, len(sigmas)):
+            if np.isnan(sigmas[i]): #checking where conversion failed due to lack of zspec value
+                sigmas[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
         sizes = (sizes / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
         sigmas = (sigmas / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        return sizes, sigmas
+        return sizes, sigmas #NOTE: I'm calling these sigmas based on what I found in https://nbviewer.org/github/djpine/linfit/blob/master/linfit.ipynb. 
+        # Specifically the lines below. This may not be correct for our implementation. It depends on whether the re_err values are sigma values (and what that means)
+            ## Plot data with error bars
+            #ax1.errorbar(x, y, yerr=sigmay, ecolor='k', mec='k', fmt='oC3', ms=6)
+        # Not sure if this is technically correct since according to the np documentation sigmas are specific to inverse-variance weighting
     #END RECONVERT
 
     def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, allData:bool=False, useMembers:str='only', additionalCriteria:list=None, useStandards:bool=True, typeRestrict:str=None, color:str='black'):
@@ -356,7 +363,11 @@ class GOGREEN:
         # Extract mass values
         mass = data['Mstellar'].values
         # Transform error values into weights
-        weights = 1/sigmas
+        weights = np.abs(1/sigmas) # for use in fit() -> https://numpy.org/doc/stable/reference/generated/numpy.polynomial.polynomial.Polynomial.fit.html#numpy.polynomial.polynomial.Polynomial.fit
+        for i in range(0, len(weights)):
+            if np.isnan(weights[i]) or np.isinf(weights[i]): #NOTE: how should we be handling this?
+                weights[i] = 0
+        print(weights)
         # Calculate coefficients (slope and y-intercept)
         xFitData = mass
         yFitData = size
