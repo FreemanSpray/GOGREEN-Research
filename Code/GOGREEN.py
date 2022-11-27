@@ -819,9 +819,9 @@ class GOGREEN:
                 yData = data[yQuantityName].values
                 # Check if either axis is measuring effective radius for the purpose of unit conversion.
                 if xQuantityName == 're':
-                    xData = self.reConvert(data)
+                    xData, xSigmas = self.reConvert(data)
                 if yQuantityName == 're':
-                    yData = self.reConvert(data)
+                    yData, ySigmas = self.reConvert(data)
                 # Check if either axis needs to be put in log scale
                 if useLog[0] == True:
                     xData = np.log10(xData)
@@ -850,11 +850,11 @@ class GOGREEN:
                 photYData = photZ[yQuantityName].values
                 # Check if either axis is measuring effective radius for the purpose of unit conversion.
                 if xQuantityName == 're':
-                    specXData = self.reConvert(specZ)
-                    photXData = self.reConvert(photZ)
+                    specXData, specXSigmas = self.reConvert(specZ)
+                    photXData, photXSigmas = self.reConvert(photZ)
                 if yQuantityName == 're':
-                    specYData = self.reConvert(specZ)
-                    photYData = self.reConvert(photZ)
+                    specYData, photXSigmas = self.reConvert(specZ)
+                    photYData, photYSigmas = self.reConvert(photZ)
                 # Check if either axis needs to be put in log scale
                 if useLog[0] == True:
                     specXData = np.log10(specXData)
@@ -896,11 +896,11 @@ class GOGREEN:
                 starFormingY = starForming[yQuantityName].values
                 # Check if either axis is measuring effective radius for the purpose of unit conversion.
                 if xQuantityName == 're':
-                    passiveX = self.reConvert(passive)
-                    starFormingX = self.reConvert(starForming)
+                    passiveX, passiveXSigmas = self.reConvert(passive)
+                    starFormingX, starFormingXSigmas = self.reConvert(starForming)
                 if yQuantityName == 're':
-                    passiveY = self.reConvert(passive)
-                    starFormingY = self.reConvert(starForming)
+                    passiveY, passiveYSigmas = self.reConvert(passive)
+                    starFormingY, starFormingYSigmas = self.reConvert(starForming)
                 # Check if either axis needs to be put in log scale
                 if useLog[0] == True:
                     passiveX = np.log10(passiveX)
@@ -936,11 +936,11 @@ class GOGREEN:
                 spiralY = spiral[yQuantityName].values
                 # Check if either axis is measuring effective radius for the purpose of unit conversion.
                 if xQuantityName == 're':
-                    ellipticalX = self.reConvert(elliptical)
-                    spiralX = self.reConvert(spiral)
+                    ellipticalX, ellipticalXSigmas = self.reConvert(elliptical)
+                    spiralX, spiralXSigmas = self.reConvert(spiral)
                 if yQuantityName == 're':
-                    ellipticalY = self.reConvert(elliptical)
-                    spiralY = self.reConvert(spiral)
+                    ellipticalY, ellipticalYSigmas = self.reConvert(elliptical)
+                    spiralY, spiralYSigmas = self.reConvert(spiral)
                 # Check if either axis needs to be put in log scale
                 if useLog[0] == True:
                     ellipticalX = np.log10(ellipticalX)
@@ -1001,9 +1001,9 @@ class GOGREEN:
                         yData = data[yQuantityName].values
                         # Check if either axis is measuring effective radius for the purpose of unit conversion.
                         if xQuantityName == 're':
-                            xData = self.reConvert(data)
+                            xData, xSigmas = self.reConvert(data)
                         if yQuantityName == 're':
-                            yData = self.reConvert(data)
+                            yData, ySigmas = self.reConvert(data)
                         # Check if either axis needs to be put in log scale
                         if useLog[0] == True:
                             xData = np.log10(xData)
@@ -1031,11 +1031,11 @@ class GOGREEN:
                         photYData = photZ[yQuantityName].values
                         # Check if either axis is measuring effective radius for the purpose of unit conversion.
                         if xQuantityName == 're':
-                            specXData = self.reConvert(specZ)
-                            photXData = self.reConvert(photZ)
+                            specXData, specXSigmas = self.reConvert(specZ)
+                            photXData, photXSigmas = self.reConvert(photZ)
                         if yQuantityName == 're':
-                            specYData = self.reConvert(specZ)
-                            photYData = self.reConvert(photZ)
+                            specYData, specYSigmas = self.reConvert(specZ)
+                            photYData, photYSigmas = self.reConvert(photZ)
                         # Check if either axis needs to be put in log scale
                         if useLog[0] == True:
                             specXData = np.log10(specXData)
@@ -1076,11 +1076,11 @@ class GOGREEN:
                         starFormingY = starForming[yQuantityName].values
                         # Check if either axis is measuring effective radius for the purpose of unit conversion.
                         if xQuantityName == 're':
-                            passiveX = self.reConvert(passive)
-                            starFormingX = self.reConvert(starForming)
+                            passiveX, passiveXSigmas = self.reConvert(passive)
+                            starFormingX, starFormingXSigmas = self.reConvert(starForming)
                         if yQuantityName == 're':
-                            passiveY = self.reConvert(passive)
-                            starFormingY = self.reConvert(starForming)
+                            passiveY, passiveYSigmas = self.reConvert(passive)
+                            starFormingY, starFormingYSigmas = self.reConvert(starForming)
                         # Check if either axis needs to be put in log scale
                         if useLog[0] == True:
                             passiveX = np.log10(passiveX)
@@ -1115,11 +1115,11 @@ class GOGREEN:
                         spiralY = spiral[yQuantityName].values
                         # Check if either axis is measuring effective radius for the purpose of unit conversion.
                         if xQuantityName == 're':
-                            ellipticalX = self.reConvert(elliptical)
-                            spiralX = self.reConvert(spiral)
+                            ellipticalX, ellipticalXSigmas = self.reConvert(elliptical)
+                            spiralX, spiralXSigmas = self.reConvert(spiral)
                         if yQuantityName == 're':
-                            ellipticalY = self.reConvert(elliptical)
-                            spiralY = self.reConvert(spiral)
+                            ellipticalY, ellipticalYSigmas = self.reConvert(elliptical)
+                            spiralY, spiralYSigmas = self.reConvert(spiral)
                         # Check if either axis needs to be put in log scale
                         if useLog[0] == True:
                             ellipticalX = np.log10(ellipticalX)
@@ -1189,9 +1189,9 @@ class GOGREEN:
                     yData = data[yQuantityName].values
                     # Check if either axis is measuring effective radius for the purpose of unit conversion.
                     if xQuantityName == 're':
-                        xData = self.reConvert(data)
+                        xData, xSigmas = self.reConvert(data)
                     if yQuantityName == 're':
-                        yData = self.reConvert(data)
+                        yData, ySigmas = self.reConvert(data)
                     # Check if either axis needs to be put in log scale
                     if useLog[0] == True:
                         xData = np.log10(xData)
@@ -1212,11 +1212,11 @@ class GOGREEN:
                     photYData = photZ[yQuantityName].values
                     # Check if either axis is measuring effective radius for the purpose of unit conversion.
                     if xQuantityName == 're':
-                        specXData = self.reConvert(specZ)
-                        photXData = self.reConvert(photZ)
+                        specXData, specXSigmas = self.reConvert(specZ)
+                        photXData, photXSigmas = self.reConvert(photZ)
                     if yQuantityName == 're':
-                        specYData = self.reConvert(specZ)
-                        photYData = self.reConvert(photZ)
+                        specYData, specYSigmas = self.reConvert(specZ)
+                        photYData, photYSigmas = self.reConvert(photZ)
                     # Check if either axis needs to be put in log scale
                     if useLog[0] == True:
                         specXData = np.log10(specXData)
@@ -1255,11 +1255,11 @@ class GOGREEN:
                     starFormingY = starForming[yQuantityName].values
                     # Check if either axis is measuring effective radius for the purpose of unit conversion
                     if xQuantityName == 're':
-                        passiveX = self.reConvert(passive)
-                        starFormingX = self.reConvert(starForming)
+                        passiveX, passiveXSigmas = self.reConvert(passive)
+                        starFormingX, starFormingXSigmas = self.reConvert(starForming)
                     if yQuantityName == 're':
-                        passiveY = self.reConvert(passive)
-                        starFormingY = self.reConvert(starForming)
+                        passiveY, passiveYSigmas = self.reConvert(passive)
+                        starFormingY, starFormingYSigmas = self.reConvert(starForming)
                     # Check if either axis needs to be put in log scale
                     if useLog[0] == True:
                         passiveX = np.log10(passiveX)
@@ -1292,11 +1292,11 @@ class GOGREEN:
                     spiralY = spiral[yQuantityName].values
                     # Check if either axis is measuring effective radius for the purpose of unit conversion.
                     if xQuantityName == 're':
-                        ellipticalX = self.reConvert(elliptical)
-                        spiralX = self.reConvert(spiral)
+                        ellipticalX, ellipticalXSigmas = self.reConvert(elliptical)
+                        spiralX, spriralXSigmas = self.reConvert(spiral)
                     if yQuantityName == 're':
-                        ellipticalY = self.reConvert(elliptical)
-                        spiralY = self.reConvert(spiral)
+                        ellipticalY, ellipticalYSigmas = self.reConvert(elliptical)
+                        spiralY, spiralYSigmas = self.reConvert(spiral)
                     # Check if either axis needs to be put in log scale
                     if useLog[0] == True:
                         ellipticalX = np.log10(ellipticalX)
