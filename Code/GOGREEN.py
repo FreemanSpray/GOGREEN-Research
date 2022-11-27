@@ -263,7 +263,7 @@ class GOGREEN:
         plt.plot(xValues, Re, linestyle='dashed', color='black')
     #END PLOTVANDERWELLINES
 
-    def reConvert(self, data:list) -> list:
+    def reConvert(self, data:pd.DataFrame) -> tuple[list, list]:
         """
         reConvert convert effective radius values from units of arcsec to kpc.
 
@@ -275,13 +275,13 @@ class GOGREEN:
             # If there are no values, return empty array so attempting to convert does not cause a crash
             return []
         sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
+        sigmas = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
         for i in range(0, len(sizes)):
-            if np.isnan(sizes[i]) == True: #checking where conversion failed due to lack of zspec value
+            if np.isnan(sizes[i]): #checking where conversion failed due to lack of zspec value
                 sizes[i] = data['re'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-            if np.isnan(sizes[i]) == True: #checking if there are any remaining missing values (either because there is no redshift or there is no re)
-                sizes[i] = 1 #setting to arbitrary value so polyfit will not fail (is there a way to simply exclude these galaxies?).  NOTE: arbitrary value CANNOT be 0.
         sizes = (sizes / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        return sizes
+        sigmas = (sigmas / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
+        return sizes, sigmas
     #END RECONVERT
 
     def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, allData:bool=False, useMembers:str='only', additionalCriteria:list=None, useStandards:bool=True, typeRestrict:str=None, color:str='black'):
@@ -351,12 +351,12 @@ class GOGREEN:
                 data = data.query('n < 2.5')
         # Remove data points that would cause an error (because nan cases in Mstellar are not caught by standard criteria)
         data = self.cutBadData(data)
-        # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-        size = self.reConvert(data)
+        # Convert all effective radii and associated errors from units of arcsec to kpc using their spectroscopic redshifts
+        size, sigmas = self.reConvert(data)
         # Extract mass values
         mass = data['Mstellar'].values
-        # Extract error values and transform into weights
-        weights = 1/data['re_err'].values
+        # Transform error values into weights
+        weights = 1/sigmas
         # Calculate coefficients (slope and y-intercept)
         xFitData = mass
         yFitData = size
