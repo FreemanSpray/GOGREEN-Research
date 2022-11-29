@@ -196,6 +196,8 @@ class GOGREEN:
         if useStandards:
             for criteria in self.standardCriteria:
                 frame = frame.query(criteria)
+        # Remove data points that would cause an error (because nan cases are not caught by standard criteria)
+        frame = self.cutBadData(frame)
         return frame
     # END REDUCEDF
         
@@ -275,20 +277,17 @@ class GOGREEN:
             # If there are no values, return empty array so attempting to convert does not cause a crash
             return [], []
         sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-        sigmas = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
+        #errs = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
         for i in range(0, len(sizes)):
             if np.isnan(sizes[i]): #checking where conversion failed due to lack of zspec value
                 sizes[i] = data['re'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-        for i in range(0, len(sigmas)):
-            if np.isnan(sigmas[i]): #checking where conversion failed due to lack of zspec value
-                sigmas[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
+        #for i in range(0, len(errs)):
+        #    if np.isnan(errs[i]): #checking where conversion failed due to lack of zspec value
+        #       errs[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
         sizes = (sizes / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        sigmas = (sigmas / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        return sizes, sigmas #NOTE: I'm calling these sigmas based on what I found in https://nbviewer.org/github/djpine/linfit/blob/master/linfit.ipynb. 
-        # Specifically the lines below. This may not be correct for our implementation. It depends on whether the re_err values are sigma values (and what that means)
-            ## Plot data with error bars
-            #ax1.errorbar(x, y, yerr=sigmay, ecolor='k', mec='k', fmt='oC3', ms=6)
-        # Not sure if this is technically correct since according to the np documentation sigmas are specific to inverse-variance weighting
+        #errs = (errs / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
+        sigmas = self.getSigmas(sizes)
+        return sizes, sigmas
     #END RECONVERT
 
     def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, allData:bool=False, useMembers:str='only', additionalCriteria:list=None, useStandards:bool=True, typeRestrict:str=None, color:str='black'):
@@ -356,17 +355,12 @@ class GOGREEN:
             # Handling case where only star forming galaxies out of all data need to plotted.
             if typeRestrict == 'spiral':
                 data = data.query('n < 2.5')
-        # Remove data points that would cause an error (because nan cases in Mstellar are not caught by standard criteria)
-        data = self.cutBadData(data)
         # Convert all effective radii and associated errors from units of arcsec to kpc using their spectroscopic redshifts
         size, sigmas = self.reConvert(data)
         # Extract mass values
         mass = data['Mstellar'].values
         # Transform error values into weights
-        weights = np.abs(1/sigmas) # for use in fit() -> https://numpy.org/doc/stable/reference/generated/numpy.polynomial.polynomial.Polynomial.fit.html#numpy.polynomial.polynomial.Polynomial.fit
-        for i in range(0, len(weights)):
-            if np.isnan(weights[i]) or np.isinf(weights[i]): #NOTE: how should we be handling this?
-                weights[i] = 0
+        weights = np.abs(1/np.array(sigmas)) # for use in fit() -> https://numpy.org/doc/stable/reference/generated/numpy.polynomial.polynomial.Polynomial.fit.html#numpy.polynomial.polynomial.Polynomial.fit
         print(weights)
         # Calculate coefficients (slope and y-intercept)
         xFitData = mass
@@ -375,7 +369,7 @@ class GOGREEN:
             xFitData = np.log10(xFitData)
         if useLog[1] == True:
             yFitData = np.log10(yFitData)
-        m, b = np.polyfit(xFitData, yFitData, 1) #slope and intercept for best fit line
+        #m, b = np.polyfit(xFitData, yFitData, 1) #slope and intercept for best fit line
         m1, b1 = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
         print((m,b,m1,b1))
         if row != None and col != None:
@@ -407,13 +401,13 @@ class GOGREEN:
         """
         badDataIndices = []
         for i in range(0, len(data['Mstellar'])):
-            # Check if there are any remaining missing values (in the rare case where there is no Mstellar value)
-            if np.isnan(data['Mstellar'].values[i]) == True:
+            # Check if there are any remaining missing values (in the rare case where there is no Mstellar value, no re value, or there are no redshift values)
+            if np.isnan(data['Mstellar'].values[i]) or np.isnan(data['re'].values[i]) or (np.isnan(data['zspec'].values[i]) and np.isnan(data['zphot'].values[i])):
                 # Add the index of this data point to the list of those to be removed once all data points have been checked.
                 badDataIndices.append(i)
         for j in range(len(badDataIndices) - 1, -1, -1):
             # Iterate through the array of indices, removing the data at these indices from both axis arrays.
-            data = pd.concat([data[:badDataIndices[j]], data[badDataIndices[j]+1:]]) 
+            data = pd.concat([data[:badDataIndices[j]], data[badDataIndices[j]+1:]])
         return data
 
     def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
@@ -615,6 +609,13 @@ class GOGREEN:
         """
         return 1.253 * (np.std(data)/np.sqrt(len(data)))
     #END GETSTDERROR
+
+    def getSigmas(self, data:list=None) -> list:
+        sigmas = []
+        mean = np.mean(data)
+        for i in data:
+            sigmas.append(i - mean)
+        return sigmas
 
     def plotStdError(self, median:int=None, bin:int=None, stdError:int=None, color:str=None):
         """
