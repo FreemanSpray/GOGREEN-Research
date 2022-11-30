@@ -196,8 +196,8 @@ class GOGREEN:
         if useStandards:
             for criteria in self.standardCriteria:
                 frame = frame.query(criteria)
-        # Remove data points that would cause an error (because nan cases are not caught by standard criteria)
-        frame = self.cutBadData(frame)
+        # Remove data points that would cause an error (it's not clear to me whether this is necessary. It seems as though standard criteria does not catch nan cases)
+        #frame = self.cutBadData(frame)
         return frame
     # END REDUCEDF
         
@@ -277,16 +277,15 @@ class GOGREEN:
             # If there are no values, return empty array so attempting to convert does not cause a crash
             return [], []
         sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-        #errs = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
+        sigmas = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
         for i in range(0, len(sizes)):
             if np.isnan(sizes[i]): #checking where conversion failed due to lack of zspec value
                 sizes[i] = data['re'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-        #for i in range(0, len(errs)):
-        #    if np.isnan(errs[i]): #checking where conversion failed due to lack of zspec value
-        #       errs[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
+        for i in range(0, len(sigmas)):
+            if np.isnan(sigmas[i]): #checking where conversion failed due to lack of zspec value
+               sigmas[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
         sizes = (sizes / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        #errs = (errs / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        sigmas = self.getSigmas(sizes)
+        sigmas = (sigmas / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
         return sizes, sigmas
     #END RECONVERT
 
@@ -360,8 +359,7 @@ class GOGREEN:
         # Extract mass values
         mass = data['Mstellar'].values
         # Transform error values into weights
-        weights = np.abs(1/np.array(sigmas)) # for use in fit() -> https://numpy.org/doc/stable/reference/generated/numpy.polynomial.polynomial.Polynomial.fit.html#numpy.polynomial.polynomial.Polynomial.fit
-        print(weights)
+        weights = 1/np.array(sigmas) # for use in fit() -> https://numpy.org/doc/stable/reference/generated/numpy.polynomial.polynomial.Polynomial.fit.html#numpy.polynomial.polynomial.Polynomial.fit
         # Calculate coefficients (slope and y-intercept)
         xFitData = mass
         yFitData = size
@@ -369,9 +367,9 @@ class GOGREEN:
             xFitData = np.log10(xFitData)
         if useLog[1] == True:
             yFitData = np.log10(yFitData)
-        #m, b = np.polyfit(xFitData, yFitData, 1) #slope and intercept for best fit line
+            weights = np.log10(weights)
+        m, b = np.polyfit(xFitData, yFitData, 1)
         m1, b1 = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
-        print((m,b,m1,b1))
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -387,6 +385,7 @@ class GOGREEN:
             plt.plot(xFitData, m * xFitData + b, color='white', linewidth=4)
         # Plot the best fit line
         plt.plot(xFitData, m * xFitData + b, color=color)
+        plt.plot(xFitData, m1 * xFitData + b1, color='red')
     # END MSRFIT
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
@@ -609,13 +608,6 @@ class GOGREEN:
         """
         return 1.253 * (np.std(data)/np.sqrt(len(data)))
     #END GETSTDERROR
-
-    def getSigmas(self, data:list=None) -> list:
-        sigmas = []
-        mean = np.mean(data)
-        for i in data:
-            sigmas.append(i - mean)
-        return sigmas
 
     def plotStdError(self, median:int=None, bin:int=None, stdError:int=None, color:str=None):
         """
