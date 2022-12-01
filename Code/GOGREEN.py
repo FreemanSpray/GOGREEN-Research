@@ -367,9 +367,18 @@ class GOGREEN:
             xFitData = np.log10(xFitData)
         if useLog[1] == True:
             yFitData = np.log10(yFitData)
-            weights = np.log10(weights)
+            upperSigmas = np.log10(size + sigmas) - np.log10(size)
+            lowerSigmas = np.log10(size) - np.log10(size - sigmas)
+            sigmas = (upperSigmas + lowerSigmas)/2
+            weights = 1/np.array(sigmas)
+        for i in range(0, len(weights)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
+            if np.isinf(weights[i]):
+                weights[i] = 0 #setting to 0 because this data point should not be used
+            if np.isnan(weights[i]):
+                weights[i] = 0 #setting to 0 because this data point should not be used
         m, b = np.polyfit(xFitData, yFitData, 1)
         m1, b1 = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
+        print(m1,b1)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
