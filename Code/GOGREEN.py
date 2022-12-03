@@ -8,6 +8,7 @@ import pandas as pd
 import random as rng
 import os
 import warnings
+import scipy.optimize as opt
 
 
 
@@ -396,6 +397,10 @@ class GOGREEN:
         plt.plot(xFitData, m * xFitData + b, color=color)
         plt.plot(xFitData, m1 * xFitData + b1, color='red')
     # END MSRFIT
+
+    def bootstrap(self):
+        print((lambda x, m, b: m*x + b)(1, 0.5, 1))
+    # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
         """
