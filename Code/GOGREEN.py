@@ -379,7 +379,6 @@ class GOGREEN:
                 weights[i] = 0 #setting to 0 because this data point should not be used
         m, b = np.polyfit(xFitData, yFitData, 1)
         m1, b1 = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
-        print(m1,b1)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -389,6 +388,7 @@ class GOGREEN:
                 # Plot the best fit line
                 axes[row][col].plot(xFitData, m * xFitData + b, color=color)
                 axes[row][col].plot(xFitData, m1 * xFitData + b1, color='red')
+                self.bootstrap(xFitData, yFitData, sigmas)
                 return
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
@@ -396,10 +396,42 @@ class GOGREEN:
         # Plot the best fit line
         plt.plot(xFitData, m * xFitData + b, color=color)
         plt.plot(xFitData, m1 * xFitData + b1, color='red')
+        self.bootstrap(xFitData, yFitData, sigmas)
     # END MSRFIT
 
-    def bootstrap(xs:list=None, ys:list=None, m:int=None, b:int=None, sigmas:list=None):
-        mOpt, bOpt = opt(f=(lambda x, m, b: m*x + b), xdata=xs, ydata=ys, p0=[m, b], sigma=sigmas),
+    def bootstrap(self, x:list=None, y:list=None, sigmas:list=None):
+        """
+        bootstrap obtains a measure of error of the line-fitting equation ...
+        
+        :param x     :    List containing the mass values of the data set
+                                Default: None
+        :param y     :    List containing the size values corresponding to each mass value in the data set
+                                Default: None
+        :param sigmas:    List containing the error values corresponding to each size value in the data set
+                                Default: None
+        :return      :    ...
+        """
+        for i in range(0,100):
+            size = len(x)
+            # Initialize new array of synthetic data
+            mutatedX = []
+            # Fill mutatedX with randomly selected mass values from x
+            for j in range(0, size):
+                randIndex = rng.randrange(0, size - 1)
+                mutatedX.append(x[randIndex])
+            # Sort array
+            mutatedX.sort()
+            # Fit data with equation
+            #vals, cov = opt.curve_fit(f=(lambda x, a, b, c: a + b*x + c*x*x), xdata=mutatedX, ydata=y, p0=[0, 0, 0], sigma=sigmas)
+            vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=mutatedX, ydata=y, p0=[0, 0], sigma=sigmas)
+            # Initialize output data for fit
+            fitY = []
+            # Calculate outputs
+            for j in range(0, size):
+                #fitY.append(vals[0] + mutatedX[j]*vals[1] + mutatedX[j]*mutatedX[j]*vals[2])
+                fitY.append(vals[0] + mutatedX[j]*vals[1])
+            # Plot curve
+            plt.plot(mutatedX, fitY, color="red")
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
