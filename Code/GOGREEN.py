@@ -359,8 +359,6 @@ class GOGREEN:
         size, sigmas = self.reConvert(data)
         # Extract mass values
         mass = data['Mstellar'].values
-        # Transform error values into weights
-        weights = 1/np.array(sigmas) # for use in fit() -> https://numpy.org/doc/stable/reference/generated/numpy.polynomial.polynomial.Polynomial.fit.html#numpy.polynomial.polynomial.Polynomial.fit
         # Calculate coefficients (slope and y-intercept)
         xFitData = mass
         yFitData = size
@@ -371,14 +369,16 @@ class GOGREEN:
             upperSigmas = np.log10(size + sigmas) - np.log10(size)
             lowerSigmas = np.log10(size) - np.log10(size - sigmas)
             sigmas = (upperSigmas + lowerSigmas)/2
-            weights = 1/np.array(sigmas)
+        # Transform error values into weights
+        weights = 1/np.array(sigmas)
         for i in range(0, len(weights)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
             if np.isinf(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
         m, b = np.polyfit(xFitData, yFitData, 1)
-        m1, b1 = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
+        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
+        #print(s) I have no idea what rules this return value conforms to. the man page for fit() calls it a series. It is callable as a function. The syntax displayed is not familiar to me (x**1).
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -387,7 +387,7 @@ class GOGREEN:
                     axes[row][col].plot(xFitData, m * xFitData + b, color='white', linewidth=4)
                 # Plot the best fit line
                 axes[row][col].plot(xFitData, m * xFitData + b, color=color)
-                axes[row][col].plot(xFitData, m1 * xFitData + b1, color='red')
+                axes[row][col].plot(xFitData, s(xFitData), color='red')
                 self.bootstrap(xFitData, yFitData, sigmas)
                 return
         # Add white backline in case of plotting multiple fit lines in one plot
@@ -395,7 +395,7 @@ class GOGREEN:
             plt.plot(xFitData, m * xFitData + b, color='white', linewidth=4)
         # Plot the best fit line
         plt.plot(xFitData, m * xFitData + b, color=color)
-        plt.plot(xFitData, m1 * xFitData + b1, color='red')
+        plt.plot(xFitData, s(xFitData), color='red')
         self.bootstrap(xFitData, yFitData, sigmas)
     # END MSRFIT
 
@@ -422,16 +422,20 @@ class GOGREEN:
             # Sort array
             mutatedX.sort()
             # Fit data with equation
-            #vals, cov = opt.curve_fit(f=(lambda x, a, b, c: a + b*x + c*x*x), xdata=mutatedX, ydata=y, p0=[0, 0, 0], sigma=sigmas)
-            vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=mutatedX, ydata=y, p0=[0, 0], sigma=sigmas)
-            # Initialize output data for fit
-            fitY = []
-            # Calculate outputs
-            for j in range(0, size):
-                #fitY.append(vals[0] + mutatedX[j]*vals[1] + mutatedX[j]*mutatedX[j]*vals[2])
-                fitY.append(vals[0] + mutatedX[j]*vals[1])
-            # Plot curve
-            plt.plot(mutatedX, fitY, color="red")
+            try:
+                vals, cov = opt.curve_fit(f=(lambda x, a, b, c: a + b*x + c*x*x), xdata=mutatedX, ydata=y, p0=[0, 0, 0], sigma=sigmas)
+                #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=mutatedX, ydata=y, p0=[0, 0], sigma=sigmas)
+                # Initialize output data for fit
+                fitY = []
+                # Calculate outputs
+                for j in range(0, size):
+                    fitY.append(vals[0] + mutatedX[j]*vals[1] + mutatedX[j]*mutatedX[j]*vals[2])
+                    #fitY.append(vals[0] + mutatedX[j]*vals[1])
+                # Plot curve
+                plt.plot(mutatedX, fitY, color='green')
+            except RuntimeError:
+                print("discarded failed mutation")
+                break
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
