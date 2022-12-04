@@ -398,8 +398,8 @@ class GOGREEN:
         plt.plot(xFitData, m1 * xFitData + b1, color='red')
     # END MSRFIT
 
-    def bootstrap(self):
-        print((lambda x, m, b: m*x + b)(1, 0.5, 1))
+    def bootstrap(xs:list=None, ys:list=None, m:int=None, b:int=None, sigmas:list=None):
+        mOpt, bOpt = opt(f=(lambda x, m, b: m*x + b), xdata=xs, ydata=ys, p0=[m, b], sigma=sigmas),
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
