@@ -377,8 +377,8 @@ class GOGREEN:
             if np.isnan(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
         m, b = np.polyfit(xFitData, yFitData, 1)
-        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
-        #print(s) I have no idea what rules this return value conforms to. the man page for fit() calls it a series. It is callable as a function. The syntax displayed is not familiar to me (x**1).
+        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights) # I have no idea what rules this return value conforms to. the man page for fit() calls it a series. It is callable as a function. The syntax displayed is not familiar to me (x**1).
+        #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=xFitData, ydata=yFitData, p0=[0, 0], sigma=sigmas)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -388,7 +388,8 @@ class GOGREEN:
                 # Plot the best fit line
                 axes[row][col].plot(xFitData, m * xFitData + b, color=color)
                 axes[row][col].plot(xFitData, s(xFitData), color='red')
-                self.bootstrap(xFitData, yFitData, sigmas)
+                #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
+                self.bootstrap(xFitData, yFitData, sigmas, axes, row, col)
                 return
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
@@ -396,10 +397,11 @@ class GOGREEN:
         # Plot the best fit line
         plt.plot(xFitData, m * xFitData + b, color=color)
         plt.plot(xFitData, s(xFitData), color='red')
-        self.bootstrap(xFitData, yFitData, sigmas)
+        #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
+        self.bootstrap(xFitData, yFitData, sigmas, axes, row, col)
     # END MSRFIT
 
-    def bootstrap(self, x:list=None, y:list=None, sigmas:list=None):
+    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None,):
         """
         bootstrap obtains a measure of error of the line-fitting equation ...
         
@@ -407,35 +409,51 @@ class GOGREEN:
                                 Default: None
         :param y     :    List containing the size values corresponding to each mass value in the data set
                                 Default: None
-        :param sigmas:    List containing the error values corresponding to each size value in the data set
+        :param error:    List containing the error values corresponding to each size value in the data set
                                 Default: None
+        :param axes:                The array of subplots created when the plotType is set to 2.
+                                     Default: None
+        :param row:                 Specifies the row of the 2D array of subplots. For use when axes is not None.
+                                     Default: None
+        :param col:                 Specifies the column of the 2D array of subplots. For use when axes is not None.
+                                     Default: None
         :return      :    ...
         """
+        failedLines = 0
+        successfulLines = 0
         for i in range(0,100):
-            size = len(x)
-            # Initialize new array of synthetic data
-            mutatedX = []
-            # Fill mutatedX with randomly selected mass values from x
-            for j in range(0, size):
-                randIndex = rng.randrange(0, size - 1)
-                mutatedX.append(x[randIndex])
-            # Sort array
-            mutatedX.sort()
-            # Fit data with equation
-            try:
-                vals, cov = opt.curve_fit(f=(lambda x, a, b, c: a + b*x + c*x*x), xdata=mutatedX, ydata=y, p0=[0, 0, 0], sigma=sigmas)
-                #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=mutatedX, ydata=y, p0=[0, 0], sigma=sigmas)
-                # Initialize output data for fit
-                fitY = []
-                # Calculate outputs
-                for j in range(0, size):
-                    fitY.append(vals[0] + mutatedX[j]*vals[1] + mutatedX[j]*mutatedX[j]*vals[2])
-                    #fitY.append(vals[0] + mutatedX[j]*vals[1])
-                # Plot curve
-                plt.plot(mutatedX, fitY, color='green')
-            except RuntimeError:
-                print("discarded failed mutation")
-                break
+            plotted = False
+            while not(plotted):
+                size = len(x)
+                # Initialize new array of synthetic data
+                randIndices = np.random.randint(0, size, size=size)
+                # Fill mutatedX with randomly selected mass values from x
+                bootstrapX = x[randIndices]
+                bootstrapY = y[randIndices]
+                boostrapE = error[randIndices]
+                # Fit data with equation
+                try:
+                    #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
+                    s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
+                    # Calculate outputs
+                    xline = np.array([np.min(x), np.max(x)])
+                    #yline = vals[0]+xline*vals[1]
+                    yline = s(xline)
+                    # Plot curve
+                    if row != None and col != None:
+                        # Check for subplots
+                        if axes[row][col] != None:
+                            axes[row][col].plot(xline, yline, color='green')
+                        else:
+                            plt.plot(xline, yline, color='green')
+                    plotted = True
+                    successfulLines+=1
+                except RuntimeError:
+                    failedLines+=1
+                except np.linalg.LinAlgError:
+                    failedLines+=1
+        print("Failed lines: " + str(failedLines))
+        print("Successful lines: " + str(successfulLines))
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
