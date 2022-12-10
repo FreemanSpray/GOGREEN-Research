@@ -9,6 +9,7 @@ import random as rng
 import os
 import warnings
 import scipy.optimize as opt
+import scipy.interpolate as interp
 
 
 
@@ -376,29 +377,30 @@ class GOGREEN:
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
-        m, b = np.polyfit(xFitData, yFitData, 1)
         s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights) # I have no idea what rules this return value conforms to. the man page for fit() calls it a series. It is callable as a function. The syntax displayed is not familiar to me (x**1).
         #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=xFitData, ydata=yFitData, p0=[0, 0], sigma=sigmas)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
+                # Bootstrapping calculation
+                self.bootstrap(xFitData, yFitData, weights, axes, row, col)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
-                    axes[row][col].plot(xFitData, m * xFitData + b, color='white', linewidth=4)
+                    #axes[row][col].plot(xFitData, s(xFitData), color='white', linewidth=4)
+                    pass
                 # Plot the best fit line
-                axes[row][col].plot(xFitData, m * xFitData + b, color=color)
-                axes[row][col].plot(xFitData, s(xFitData), color='red')
+                #axes[row][col].plot(xFitData, s(xFitData), color='red')
                 #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
-                self.bootstrap(xFitData, yFitData, sigmas, axes, row, col)
                 return
+        # Bootstrapping calculation
+        self.bootstrap(xFitData, yFitData, weights, axes, row, col)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
-            plt.plot(xFitData, m * xFitData + b, color='white', linewidth=4)
+            #plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
+            pass
         # Plot the best fit line
-        plt.plot(xFitData, m * xFitData + b, color=color)
-        plt.plot(xFitData, s(xFitData), color='red')
-        #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
-        self.bootstrap(xFitData, yFitData, sigmas, axes, row, col)
+        #plt.plot(xFitData, s(xFitData), color='red')
+        #plt.plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
     # END MSRFIT
 
     def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None,):
@@ -419,12 +421,11 @@ class GOGREEN:
                                      Default: None
         :return      :    ...
         """
-        failedLines = 0
-        successfulLines = 0
-        for i in range(0,100):
+        size = len(x)
+        yVals = np.empty((100, size))
+        for i in range(0, 100):
             plotted = False
             while not(plotted):
-                size = len(x)
                 # Initialize new array of synthetic data
                 randIndices = np.random.randint(0, size, size=size)
                 # Fill mutatedX with randomly selected mass values from x
@@ -436,7 +437,8 @@ class GOGREEN:
                     #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
                     s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
                     # Calculate outputs
-                    xline = np.array([np.min(x), np.max(x)])
+                    #xline = np.array([np.min(x), np.max(x)])
+                    xline = np.sort(x) # I use this line instead of running from min to max because it produces individual data points along the line I can utilize to get the confidence intervals.
                     #yline = vals[0]+xline*vals[1]
                     yline = s(xline)
                     # Plot curve
@@ -444,16 +446,42 @@ class GOGREEN:
                         # Check for subplots
                         if axes[row][col] != None:
                             axes[row][col].plot(xline, yline, color='green')
-                        else:
-                            plt.plot(xline, yline, color='green')
+                    else:
+                        plt.plot(xline, yline, color='green')
                     plotted = True
-                    successfulLines+=1
+                    yVals[i] = yline
                 except RuntimeError:
-                    failedLines+=1
+                    print("caught runtime error")
                 except np.linalg.LinAlgError:
-                    failedLines+=1
-        print("Failed lines: " + str(failedLines))
-        print("Successful lines: " + str(successfulLines))
+                    print("caught linear algebra error")
+        x68Cons = np.empty((size,))
+        x32Cons = np.empty((size,))
+        xMedians = np.empty((size,))
+        upperBarEnds = np.empty((size,))
+        lowerBarEnds = np.empty((size,))
+        for i in range(0, size):
+            x68Cons[i] = np.percentile(yVals[..., i], 68)
+            x32Cons[i] = np.percentile(yVals[..., i], 32)
+            xMedians[i] = np.median(yVals[..., i])
+            upperVals = x68Cons - xMedians
+            lowerVals = xMedians - x32Cons
+            plot = plt
+            # Check for subplots
+            if row != None and col != None:
+                # Check for subplots
+                if axes[row][col] != None:
+                    plot = axes[row][col]
+            # Plot 68 percent confidence intervals
+            upperContainer = plot.errorbar(xline[i], xMedians[i], upperVals[i], barsabove=True, ecolor='black')
+            lowerContainer = plot.errorbar(xline[i], xMedians[i], lowerVals[i], barsabove=False, ecolor='black')
+            # Plot curves on top and bottom of intervals
+            upperBarEnds[i] = np.max((upperContainer.lines[2][0].axes.lines[101 + 2*i].get_ydata(orig=True)))
+            lowerBarEnds[i] = np.max((lowerContainer.lines[2][0].axes.lines[101 + 2*i].get_ydata(orig=True)))
+            #print(upperBarEnds)
+            #plot.plot(xline, lowerBarEnds)
+        print(upperContainer.lines[2][0].axes.lines[101].get_ydata(orig=True))
+        plot.plot(xline, upperBarEnds, color='blue')
+        plot.plot(xline, lowerBarEnds, color='blue')
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
