@@ -386,20 +386,18 @@ class GOGREEN:
                 self.bootstrap(xFitData, yFitData, weights, axes, row, col)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
-                    #axes[row][col].plot(xFitData, s(xFitData), color='white', linewidth=4)
-                    pass
+                    axes[row][col].plot(xFitData, s(xFitData), color='white', linewidth=4)
                 # Plot the best fit line
-                #axes[row][col].plot(xFitData, s(xFitData), color='red')
+                axes[row][col].plot(xFitData, s(xFitData), color='red')
                 #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
                 return
         # Bootstrapping calculation
         self.bootstrap(xFitData, yFitData, weights, axes, row, col)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
-            #plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
-            pass
+            plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
         # Plot the best fit line
-        #plt.plot(xFitData, s(xFitData), color='red')
+        plt.plot(xFitData, s(xFitData), color='red')
         #plt.plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
     # END MSRFIT
 
@@ -445,9 +443,11 @@ class GOGREEN:
                     if row != None and col != None:
                         # Check for subplots
                         if axes[row][col] != None:
-                            axes[row][col].plot(xline, yline, color='green')
+                            #axes[row][col].plot(xline, yline, color='green')
+                            pass
                     else:
-                        plt.plot(xline, yline, color='green')
+                        #plt.plot(xline, yline, color='green')
+                        pass
                     plotted = True
                     yVals[i] = yline
                 except RuntimeError:
@@ -472,16 +472,20 @@ class GOGREEN:
                 if axes[row][col] != None:
                     plot = axes[row][col]
             # Plot 68 percent confidence intervals
-            upperContainer = plot.errorbar(xline[i], xMedians[i], upperVals[i], barsabove=True, ecolor='black')
-            lowerContainer = plot.errorbar(xline[i], xMedians[i], lowerVals[i], barsabove=False, ecolor='black')
+            upperContainer = plot.errorbar(xline[i], xMedians[i], upperVals[i], capsize=0.1, barsabove=True, ecolor='black')
+            lowerContainer = plot.errorbar(xline[i], xMedians[i], lowerVals[i], capsize=0.1, barsabove=False, ecolor='black')
             # Plot curves on top and bottom of intervals
-            upperBarEnds[i] = np.max((upperContainer.lines[2][0].axes.lines[101 + 2*i].get_ydata(orig=True)))
-            lowerBarEnds[i] = np.max((lowerContainer.lines[2][0].axes.lines[101 + 2*i].get_ydata(orig=True)))
-            #print(upperBarEnds)
-            #plot.plot(xline, lowerBarEnds)
-        print(upperContainer.lines[2][0].axes.lines[101].get_ydata(orig=True))
+            upperBarEnds[i] = np.max((upperContainer.lines[1][0].get_ydata(orig=True)))
+            lowerBarEnds[i] = np.max((lowerContainer.lines[1][1].get_ydata(orig=True)))
+        #print(upperContainer.lines[2][0].axes.lines[0].get_ydata(orig=True))
+        #print(upperContainer.lines[2][0].axes.lines[1].get_ydata(orig=True))
+        #print(upperContainer.lines[2][0].axes.lines[2].get_ydata(orig=True))
+        #for i in range(0, size, 3):
+        #    upperBarEnds[i] = upperContainer.lines[2][0].axes.lines[i+2].get_ydata(orig=True)
+        #    lowerBarEnds[i] = upperContainer.lines[2][0].axes.lines[i+1].get_ydata(orig=True)      
         plot.plot(xline, upperBarEnds, color='blue')
         plot.plot(xline, lowerBarEnds, color='blue')
+        plot.fill_between(xline, lowerBarEnds, upperBarEnds) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
