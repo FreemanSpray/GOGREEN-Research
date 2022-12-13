@@ -437,8 +437,7 @@ class GOGREEN:
                     #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
                     s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
                     # Store s
-                    print(s)
-                    coefficients = np.append(coefficients, s)
+                    coefficients = np.append(coefficients, s.convert().coef)
                     # Calculate outputs
                     xline = np.array([xMin, xMax])
                     #yline = vals[0]+xline*vals[1]
@@ -466,9 +465,10 @@ class GOGREEN:
         yEnds = np.empty((gridSize,))
         for i in range(0, gridSize):
             for j in range(0, 100):
-                s =  coefficients[j]
+                s = coefficients[j]
                 print(s)
-                yGrid[i][j] = s(xGrid(i))
+                # Calculate y using y = mx + b (NOTE: not currently sure what s is outputting still. I'm just using y = mx here.)
+                yGrid[i][j] = xGrid[i]*coefficients[j]
         for i in range(0, gridSize):
             # Calculate 68% confidence interval
             yEnds[i] = (np.percentile(yGrid[i], 84), np.percentile(yGrid[i], 16))
