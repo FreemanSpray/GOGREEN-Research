@@ -420,7 +420,9 @@ class GOGREEN:
         :return      :    ...
         """
         size = len(x)
-        yVals = np.empty((100, size))
+        xMin = np.min(x)
+        xMax = np.max(x)
+        coefficients = np.empty((100, size))
         for i in range(0, 100):
             plotted = False
             while not(plotted):
@@ -434,58 +436,52 @@ class GOGREEN:
                 try:
                     #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
                     s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
+                    # Store s
+                    print(s)
+                    coefficients = np.append(coefficients, s)
                     # Calculate outputs
-                    #xline = np.array([np.min(x), np.max(x)])
-                    xline = np.sort(x) # I use this line instead of running from min to max because it produces individual data points along the line I can utilize to get the confidence intervals.
+                    xline = np.array([xMin, xMax])
                     #yline = vals[0]+xline*vals[1]
                     yline = s(xline)
                     # Plot curve
                     if row != None and col != None:
                         # Check for subplots
                         if axes[row][col] != None:
-                            #axes[row][col].plot(xline, yline, color='green')
-                            pass
+                           axes[row][col].plot(xline, yline, color='green')
+                            #pass
                     else:
-                        #plt.plot(xline, yline, color='green')
-                        pass
+                        plt.plot(xline, yline, color='green')
+                        #pass
                     plotted = True
-                    yVals[i] = yline
                 except RuntimeError:
                     print("caught runtime error")
                 except np.linalg.LinAlgError:
                     print("caught linear algebra error")
-        x68Cons = np.empty((size,))
-        x32Cons = np.empty((size,))
-        xMedians = np.empty((size,))
-        upperBarEnds = np.empty((size,))
-        lowerBarEnds = np.empty((size,))
-        for i in range(0, size):
-            x68Cons[i] = np.percentile(yVals[..., i], 68)
-            x32Cons[i] = np.percentile(yVals[..., i], 32)
-            xMedians[i] = np.median(yVals[..., i])
-            upperVals = x68Cons - xMedians
-            lowerVals = xMedians - x32Cons
-            plot = plt
+        print(coefficients)
+        # Create grid of points to test calculated m & b values at.
+        xGrid = np.arange(xMin, xMax, 0.1)
+        gridSize = len(xGrid)
+        yGrid = np.array((gridSize, 100))
+        # Initialize interval endpoint storage
+        yEnds = np.empty((gridSize,))
+        for i in range(0, gridSize):
+            for j in range(0, 100):
+                s =  coefficients[j]
+                print(s)
+                yGrid[i][j] = s(xGrid(i))
+        for i in range(0, gridSize):
+            # Calculate 68% confidence interval
+            yEnds[i] = (np.percentile(yGrid[i], 84), np.percentile(yGrid[i], 16))
+        plot = plt
+        # Check for subplots
+        if row != None and col != None:
             # Check for subplots
-            if row != None and col != None:
-                # Check for subplots
-                if axes[row][col] != None:
-                    plot = axes[row][col]
-            # Plot 68 percent confidence intervals
-            upperContainer = plot.errorbar(xline[i], xMedians[i], upperVals[i], capsize=0.1, barsabove=True, ecolor='black')
-            lowerContainer = plot.errorbar(xline[i], xMedians[i], lowerVals[i], capsize=0.1, barsabove=False, ecolor='black')
-            # Plot curves on top and bottom of intervals
-            upperBarEnds[i] = np.max((upperContainer.lines[1][0].get_ydata(orig=True)))
-            lowerBarEnds[i] = np.max((lowerContainer.lines[1][1].get_ydata(orig=True)))
-        #print(upperContainer.lines[2][0].axes.lines[0].get_ydata(orig=True))
-        #print(upperContainer.lines[2][0].axes.lines[1].get_ydata(orig=True))
-        #print(upperContainer.lines[2][0].axes.lines[2].get_ydata(orig=True))
-        #for i in range(0, size, 3):
-        #    upperBarEnds[i] = upperContainer.lines[2][0].axes.lines[i+2].get_ydata(orig=True)
-        #    lowerBarEnds[i] = upperContainer.lines[2][0].axes.lines[i+1].get_ydata(orig=True)      
-        plot.plot(xline, upperBarEnds, color='blue')
-        plot.plot(xline, lowerBarEnds, color='blue')
-        plot.fill_between(xline, lowerBarEnds, upperBarEnds) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
+            if axes[row][col] != None:
+                plot = axes[row][col]
+        # Plot curves on top and bottom of intervals
+        plot.plot(xGrid, yEnds[0], color='blue')
+        plot.plot(xline, yEnds[1], color='blue')
+        plot.fill_between(xline, yEnds[0], yEnds[1]) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
