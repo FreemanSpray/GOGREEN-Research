@@ -419,10 +419,20 @@ class GOGREEN:
                                      Default: None
         :return      :    ...
         """
+        # Establish type of plot
+        plot = plt
+        # Check for subplots
+        if row != None and col != None:
+            # Check for subplots
+            if axes[row][col] != None:
+                plot = axes[row][col]
+
         size = len(x)
         xMin = np.min(x)
         xMax = np.max(x)
-        coefficients = np.empty((100, size))
+        slopes = np.empty((100,))
+        intercepts = np.empty((100,))
+        # Create 100 bootstrap lines
         for i in range(0, 100):
             plotted = False
             while not(plotted):
@@ -436,52 +446,46 @@ class GOGREEN:
                 try:
                     #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
                     s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
-                    # Store s
-                    coefficients = np.append(coefficients, s.convert().coef)
+                    coefs = s.convert().coef
+                    b = coefs[0]
+                    m = coefs[1]
+                    # Store coefficients
+                    intercepts[i] = b
+                    slopes[i] = m
                     # Calculate outputs
                     xline = np.array([xMin, xMax])
-                    #yline = vals[0]+xline*vals[1]
-                    yline = s(xline)
+                    yline = b + m*xline # Equivalent operation: yline = s(xline)
                     # Plot curve
-                    if row != None and col != None:
-                        # Check for subplots
-                        if axes[row][col] != None:
-                           axes[row][col].plot(xline, yline, color='green')
-                            #pass
-                    else:
-                        plt.plot(xline, yline, color='green')
-                        #pass
+                    plot.plot(xline, yline, color='green')
                     plotted = True
                 except RuntimeError:
                     print("caught runtime error")
                 except np.linalg.LinAlgError:
                     print("caught linear algebra error")
-        print(coefficients)
         # Create grid of points to test calculated m & b values at.
-        xGrid = np.arange(xMin, xMax, 0.1)
+        xGrid = np.arange(xMin, xMax, 0.01)
         gridSize = len(xGrid)
-        yGrid = np.array((gridSize, 100))
+        yGrid = np.empty((gridSize, 100))
         # Initialize interval endpoint storage
-        yEnds = np.empty((gridSize,))
+        yTops = np.empty((gridSize,))
+        yBots = np.empty((gridSize,))
         for i in range(0, gridSize):
             for j in range(0, 100):
-                s = coefficients[j]
-                print(s)
-                # Calculate y using y = mx + b (NOTE: not currently sure what s is outputting still. I'm just using y = mx here.)
-                yGrid[i][j] = xGrid[i]*coefficients[j]
+                # Calculate y using y = mx + b for the ith grid coordinate for the jth bootstrap line
+                yGrid[i][j] = intercepts[j] + xGrid[i]*slopes[j]
         for i in range(0, gridSize):
-            # Calculate 68% confidence interval
-            yEnds[i] = (np.percentile(yGrid[i], 84), np.percentile(yGrid[i], 16))
-        plot = plt
-        # Check for subplots
-        if row != None and col != None:
-            # Check for subplots
-            if axes[row][col] != None:
-                plot = axes[row][col]
+            # Calculate 68% confidence interval for the ith grid coordinate
+            yTops[i] = np.percentile(yGrid[i], 84)
+            yBots[i] = np.percentile(yGrid[i], 16)
         # Plot curves on top and bottom of intervals
-        plot.plot(xGrid, yEnds[0], color='blue')
-        plot.plot(xline, yEnds[1], color='blue')
-        plot.fill_between(xline, yEnds[0], yEnds[1]) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
+        plot.plot(xGrid, yTops, color='blue')
+        plot.plot(xGrid, yBots, color='blue')
+        plot.fill_between(xGrid, yBots, yTops) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
+
+        #print(yGrid[0][1])
+        #print(xGrid[0])
+        #print(intercepts[1])
+        #print(slopes[1])
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
