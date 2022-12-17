@@ -426,10 +426,9 @@ class GOGREEN:
             # Check for subplots
             if axes[row][col] != None:
                 plot = axes[row][col]
-
         # Initialize seed for consistent results across runs
         rng = np.random.RandomState(1234567890) # reference: https://stackoverflow.com/questions/5836335/consistently-create-same-random-numpy-array
-
+        # Initialize arrays
         size = len(x)
         xMin = np.min(x)
         xMax = np.max(x)
@@ -466,7 +465,7 @@ class GOGREEN:
                 except np.linalg.LinAlgError:
                     print("caught linear algebra error")
         # Create grid of points to test calculated m & b values at.
-        xGrid = np.arange(xMin, xMax, 0.01)
+        xGrid = np.linspace(xMin, xMax, 1000)
         gridSize = len(xGrid)
         yGrid = np.empty((gridSize, 100))
         # Initialize interval endpoint storage
