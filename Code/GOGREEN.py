@@ -427,6 +427,9 @@ class GOGREEN:
             if axes[row][col] != None:
                 plot = axes[row][col]
 
+        # Initialize seed for consistent results across runs
+        rng = np.random.RandomState(1234567890) # reference: https://stackoverflow.com/questions/5836335/consistently-create-same-random-numpy-array
+
         size = len(x)
         xMin = np.min(x)
         xMax = np.max(x)
@@ -437,7 +440,7 @@ class GOGREEN:
             plotted = False
             while not(plotted):
                 # Initialize new array of synthetic data
-                randIndices = np.random.randint(0, size, size=size)
+                randIndices = rng.randint(0, size, size=size)
                 # Fill mutatedX with randomly selected mass values from x
                 bootstrapX = x[randIndices]
                 bootstrapY = y[randIndices]
@@ -481,11 +484,6 @@ class GOGREEN:
         plot.plot(xGrid, yTops, color='blue')
         plot.plot(xGrid, yBots, color='blue')
         plot.fill_between(xGrid, yBots, yTops) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
-
-        #print(yGrid[0][1])
-        #print(xGrid[0])
-        #print(intercepts[1])
-        #print(slopes[1])
     # END BOOTSTRAP
 
     def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
