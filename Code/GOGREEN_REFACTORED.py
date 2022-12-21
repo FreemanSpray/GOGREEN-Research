@@ -844,9 +844,108 @@ class GOGREEN:
                 return
             print("test failed.")
     # END TEST
+    
+    def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, additionalCriteria:list=None, colorType:str=None, useStandards:bool=True, useLog:list=[False,False], fitLine:bool=False, 
+        data:pd.DataFrame=None, color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, holdLbls:bool=False):
+        # Arbitrary establishment of variables for non-coloring case
+            aData = data
+            bData = data
+            aLbl = None
+            bLbl = None
+            # Overwrite variables according to coloring scheme
+            if colorType == None:
+                # Don't need to do anything for this case. Included so program proceeds as normal
+                pass
+            elif colorType == 'membership':
+                # Extract desired quantities from data
+                aData = data[~data['zspec'].isna()]
+                aLbl = 'Spectroscopic z'
+                # Assume photZ are those that do not have a specZ
+                bData = data[~data['cPHOTID'].isin(aData['cPHOTID'])]
+                bLbl = 'Photometric z'
+            elif colorType == 'passive':
+                # Build passive query string (from van der Burg et al. 2020)
+                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
+                # Build active query string
+                starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
+                # Extract desired quantities from data
+                passive = data.query(passiveQuery)
+                starForming = data.query(starFormingQuery)
+                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                aData = self.reduceDF(passive, additionalCriteria, useStandards)
+                aLbl = 'Quiescent'
+                bData = self.reduceDF(starForming, additionalCriteria, useStandards)
+                bLbl = 'Star Forming'
+            elif colorType == 'sersic':
+                # Build elliptical query string
+                elliptical = data.query('2.5 < n < 6')
+                # Build spiral query string
+                spiral = data.query('n < 2.5')
+                # Unsure if need to reduce again. Doing it to be on the safe side.
+                aData = self.reduceDF(elliptical, additionalCriteria, useStandards)
+                aLbl = 'Elliptical'
+                bData = self.reduceDF(spiral, additionalCriteria, useStandards)
+                bLbl = 'Spiral'
+            else:
+                print(colorType, ' is not a valid coloring scheme!')
+                return
+            # Overwrite labels as needed
+            if holdLbls:
+                aLbl = None
+                bLbl = None
+            # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
+            if xQuantityName == 're':
+                aXVals, bin = self.reConvert(aData)
+                bXVals, bin = self.reConvert(bData)
+            else:
+                aXVals = aData[xQuantityName].values
+                bXVals = bData[xQuantityName].values
+            if yQuantityName == 're':
+                aYVals, bin = self.reConvert(aData)
+                bYVals, bin = self.reConvert(bData)
+            else:
+                aYVals = aData[yQuantityName].values
+                bYVals = bData[yQuantityName].values
+            # Check if either axis needs to be put in log scale
+            if useLog[0] == True:
+                aXVals = np.log10(aXVals)
+                bXVals = np.log10(bXVals)
+            if useLog[1] == True:
+                aYVals = np.log10(aYVals)
+                bYVals = np.log10(bYVals)
+            # Plot passive v star-forming border in the case where we are plotting UVJ color-color
+            if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
+                self.plotPassiveLines()
+            # generate best fit line
+            if fitLine == True:
+                # Generate two if plotting quiescent v star-forming
+                if colorType == 'passive':
+                    self.MSRfit(aData, useLog, axes, row, col, color=color1)
+                    self.MSRfit(bData, useLog, axes, row, col, color=color2)
+                else:
+                    self.MSRfit(data, axes, row, col, useLog)
+            # Generate the plot
+            plot.scatter(aXVals, aYVals, color=color1, label=aLbl)
+            if colorType != None:
+                plot.scatter(bXVals, bYVals, color=color2, label=bLbl)
+            # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
+            #if xQuantityName == 'Mstellar' and yQuantityName == 're':
+                #self.plotVanDerWelLines()
+            # Return data counts (used when running test suite)
+            xA = aXVals.shape[0]
+            yA = aYVals.shape[0]
+            if colorType != None:
+                xB = bXVals.shape[0]
+                yB = bYVals.shape[0]
+            else:
+                xB = 0
+                yB = 0
+            return (xA + xB, yA + yB)
+    # END PLOTUNWRAPPED
 
-    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None,
-             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False, file:__file__=None):
+
+    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None, colors:list=None, 
+        useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False, file:__file__=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -921,120 +1020,16 @@ class GOGREEN:
                 return
             # Apply other specified reducing constraints
             data = self.reduceDF(data, additionalCriteria, useStandards)
-            # Plot depending on how the values should be colored
-            if colorType == None:
-                # Extract desired quantities from data
-                xData = data[xQuantityName].values
-                yData = data[yQuantityName].values
-                # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                if xQuantityName == 're':
-                    xData, xSigmas = self.reConvert(data)
-                if yQuantityName == 're':
-                    yData, ySigmas = self.reConvert(data)
-                # Check if either axis needs to be put in log scale
-                if useLog[0] == True:
-                    xData = np.log10(xData)
-                if useLog[1] == True:
-                    yData = np.log10(yData)
-                # Generate the plot
-                plt.scatter(xData, yData, color=color1)
-                # generate best fit line
-                if fitLine == True:
-                    self.MSRfit(data, useLog)
-                # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    #self.plotVanDerWelLines()
-                if test:
-                    x = xData.shape[0]
-                    y = yData.shape[0]
-                    file.write(str(x) +  ' ' + str(y) + ' ')
-            else:
-                if colorType == 'membership':
-                    # Extract desired quantities from data
-                    aData = data[~data['zspec'].isna()]
-                    aLbl = 'Spectroscopic z'
-                    # Assume photZ are those that do not have a specZ
-                    bData = data[~data['cPHOTID'].isin(aData['cPHOTID'])]
-                    bLbl = 'Photometric z'
-                elif colorType == 'passive':
-                    # Build passive query string (from van der Burg et al. 2020)
-                    passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                    # Build active query string
-                    starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                    # Extract desired quantities from data
-                    passive = data.query(passiveQuery)
-                    starForming = data.query(starFormingQuery)
-                    # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                    aData = self.reduceDF(passive, additionalCriteria, useStandards)
-                    aLbl = 'Quiescent'
-                    bData = self.reduceDF(starForming, additionalCriteria, useStandards)
-                    bLbl = 'Star Forming'
-                elif colorType == 'sersic':
-                    # Build elliptical query string
-                    elliptical = data.query('2.5 < n < 6')
-                    # Build spiral query string
-                    spiral = data.query('n < 2.5')
-                    # Unsure if need to reduce again. Doing it to be on the safe side.
-                    aData = self.reduceDF(elliptical, additionalCriteria, useStandards)
-                    aLbl = 'Elliptical'
-                    bData = self.reduceDF(spiral, additionalCriteria, useStandards)
-                    bLbl = 'Spiral'
-                else:
-                    print(colorType, ' is not a valid coloring scheme!')
-                    return
-                # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
-                if xQuantityName == 're':
-                    aXVals, bin = self.reConvert(aData)
-                    bXVals, bin = self.reConvert(bData)
-                else:
-                    aXVals = aData[xQuantityName].values
-                    bXVals = bData[xQuantityName].values
-                if yQuantityName == 're':
-                    aYVals, bin = self.reConvert(aData)
-                    bYVals, bin = self.reConvert(bData)
-                else:
-                    aYVals = aData[yQuantityName].values
-                    bYVals = bData[yQuantityName].values
-                # Check if either axis needs to be put in log scale
-                if useLog[0] == True:
-                    aXVals = np.log10(aXVals)
-                    bXVals = np.log10(bXVals)
-                if useLog[1] == True:
-                    aYVals = np.log10(aYVals)
-                    bYVals = np.log10(bYVals)
-                # Plot passive v star-forming border in the case where we are plotting UVJ color-color
-                if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                    self.plotPassiveLines()
-                # generate best fit line
-                if fitLine == True:
-                    # Generate two if plotting quiescent v star-forming
-                    if colorType == 'passive':
-                        self.MSRfit(aData, useLog, color=color1)
-                        self.MSRfit(bData, useLog, color=color2)
-                    else:
-                        self.MSRfit(data, useLog)
-                # Generate the plot
-                plt.scatter(aXVals, aYVals, color=color1, label=aLbl)
-                plt.scatter(bXVals, bYVals, color=color2, label=bLbl)
-                # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    #self.plotVanDerWelLines()
-                # Write data if running test suite
-                if test:
-                    xA = aXVals.shape[0]
-                    xB = bXVals.shape[0]
-                    yA = aYVals.shape[0]
-                    yB = bYVals.shape[0]
-                    file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
-
+            # Plot data
+            x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt)
+            # Write data counts if running test suite
+            if test:
+                file.write(str(x) +  ' ' + str(y) + ' ')
         # Plot all clusters individually in a subplot
         elif plotType == 2:
-            # Initialize counters if running test suite
-            if test:
-                xA = 0
-                xB = 0
-                yA = 0
-                yB = 0
+            # Initialize data count totals (used when running test suite)
+            xTot = 0
+            yTot = 0
             # Generate the subplots
             _, axes = plt.subplots(4,3,figsize=(15,12))
             currentIndex = 0
@@ -1055,109 +1050,11 @@ class GOGREEN:
                         data = self.getNonMembers(currentClusterName)
                     # Apply other specified reducing constraints
                     data = self.reduceDF(data, additionalCriteria, useStandards)
-                    # Plot depending on how the values should be colored
-                    if colorType == None:
-                        # Extract desired quantities from data
-                        xData = data[xQuantityName].values
-                        yData = data[yQuantityName].values
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                        if xQuantityName == 're':
-                            xData, xSigmas = self.reConvert(data)
-                        if yQuantityName == 're':
-                            yData, ySigmas = self.reConvert(data)
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            xData = np.log10(xData)
-                        if useLog[1] == True:
-                            yData = np.log10(yData)
-                        # Generate the plot on the subplot
-                        axes[i][j].scatter(xData, yData, c=color1)
-                        # Add fit line
-                        if fitLine == True:
-                            self.MSRfit(data, useLog, axes, i, j)
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            #self.plotVanDerWelLines(axes, i, j)
-                        if test:
-                            xA = xA + xData.shape[0]
-                            yA = yA + yData.shape[0]
-                    else:
-                        if colorType == 'membership':
-                            # Extract desired quantities from data
-                            aData = data[~data['zspec'].isna()]
-                            aLbl = 'Spectroscopic z'
-                            # Assume photZ are those that do not have a specZ
-                            bData = data[~data['cPHOTID'].isin(aData['cPHOTID'])]
-                            bLbl = 'Photometric z'
-                        elif colorType == 'passive':
-                            # Build passive query string (from van der Burg et al. 2020)
-                            passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                            # Build active query string
-                            starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                            # Extract desired quantities from data
-                            passive = data.query(passiveQuery)
-                            starForming = data.query(starFormingQuery)
-                            # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                            aData = self.reduceDF(passive, additionalCriteria, useStandards)
-                            aLbl = 'Quiescent'
-                            bData = self.reduceDF(starForming, additionalCriteria, useStandards)
-                            bLbl = 'Star Forming'
-                        elif colorType == 'sersic':
-                            # Build elliptical query string
-                            elliptical = data.query('2.5 < n < 6')
-                            # Build spiral query string
-                            spiral = data.query('n < 2.5')
-                            # Unsure if need to reduce again. Doing it to be on the safe side.
-                            aData = self.reduceDF(elliptical, additionalCriteria, useStandards)
-                            aLbl = 'Elliptical'
-                            bData = self.reduceDF(spiral, additionalCriteria, useStandards)
-                            bLbl = 'Spiral'
-                        else:
-                            print(colorType, ' is not a valid coloring scheme!')
-                            return
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
-                        if xQuantityName == 're':
-                            aXVals, bin = self.reConvert(aData)
-                            bXVals, bin = self.reConvert(bData)
-                        else:
-                            aXVals = aData[xQuantityName].values
-                            bXVals = bData[xQuantityName].values
-                        if yQuantityName == 're':
-                            aYVals, bin = self.reConvert(aData)
-                            bYVals, bin = self.reConvert(bData)
-                        else:
-                            aYVals = aData[yQuantityName].values
-                            bYVals = bData[yQuantityName].values
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            aXVals = np.log10(aXVals)
-                            bXVals = np.log10(bXVals)
-                        if useLog[1] == True:
-                            aYVals = np.log10(aYVals)
-                            bYVals = np.log10(bYVals)
-                        # Plot passive v star-forming border in the case where we are plotting UVJ color-color
-                        if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                            self.plotPassiveLines()
-                        # generate best fit line
-                        if fitLine == True:
-                            # Generate two if plotting quiescent v star-forming
-                            if colorType == 'passive':
-                                self.MSRfit(aData, useLog,  axes, i, j, color=color1)
-                                self.MSRfit(bData, useLog, axes, i, j, color=color2)
-                            else:
-                                self.MSRfit(data, useLog, axes, i, j)
-                        # Generate the plot
-                        axes[i][j].scatter(aXVals, aYVals, color=color1, label=aLbl)
-                        axes[i][j].scatter(bXVals, bYVals, color=color2, label=bLbl)
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            #self.plotVanDerWelLines()
-                        # Write data if running test suite
-                        if test:
-                            xA = xA + aXVals.shape[0]
-                            xB = xB + bXVals.shape[0]
-                            yA = yA + aYVals.shape[0]
-                            yB = yB + bYVals.shape[0]
+                    # Plot data
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j)
+                    # Update data count totals
+                    xTot+=x
+                    yTot+=y
                     # Plot configurations for plotType 2
                     axes[i][j].set(xlabel=xLabel, ylabel=yLabel)
                     if (xRange != None):
@@ -1173,16 +1070,15 @@ class GOGREEN:
             # These specifc values were found at:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
+            # Write data counts if running test suite
             if test:
-                file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
+                file.write(str(xTot) +  ' ' + str(yTot) + ' ')
         # Plot all clusters on the same plot            
         elif plotType == 3:
+            # Initialize data count totals (used when running test suite)
+            xTot = 0
+            yTot = 0
             # Loop over every cluster
-            if test:
-                xA = 0
-                xB = 0
-                yA = 0
-                yB = 0
             for clusterName in self._structClusterNames:
                 # Get all galaxies associated with this cluster
                 data = self.getClusterGalaxies(clusterName)
@@ -1194,107 +1090,15 @@ class GOGREEN:
                     data = self.getNonMembers(clusterName)
                 # Apply other specified reducing constraints
                 data = self.reduceDF(data, additionalCriteria, useStandards)
-                 # Plot depending on how the values should be colored
-                if colorType == None:
-                    # Extract desired quantities from data
-                    xData = data[xQuantityName].values
-                    yData = data[yQuantityName].values
-                    # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                    if xQuantityName == 're':
-                        xData, xSigmas = self.reConvert(data)
-                    if yQuantityName == 're':
-                        yData, ySigmas = self.reConvert(data)
-                    # Check if either axis needs to be put in log scale
-                    if useLog[0] == True:
-                        xData = np.log10(xData)
-                    if useLog[1] == True:
-                        yData = np.log10(yData)
-                    # Generate the plot
-                    plt.scatter(xData, yData, c=color1)
-                    if test:
-                        xA = xA + xData.shape[0]
-                        yA = yA + yData.shape[0]
+                # Plot depending on how the values should be colored (hold off on MSR fit lines since this needs to be handled separately for plotType 3)
+                if (clusterName != self._structClusterNames[-1]):
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, False, data, color1, color2, plt, holdLbls=True)
+                # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
                 else:
-                        if colorType == 'membership':
-                            # Extract desired quantities from data
-                            aData = data[~data['zspec'].isna()]
-                            aLbl = 'Spectroscopic z'
-                            # Assume photZ are those that do not have a specZ
-                            bData = data[~data['cPHOTID'].isin(aData['cPHOTID'])]
-                            bLbl = 'Photometric z'
-                        elif colorType == 'passive':
-                            # Build passive query string (from van der Burg et al. 2020)
-                            passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                            # Build active query string
-                            starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                            # Extract desired quantities from data
-                            passive = data.query(passiveQuery)
-                            starForming = data.query(starFormingQuery)
-                            # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                            aData = self.reduceDF(passive, additionalCriteria, useStandards)
-                            aLbl = 'Quiescent'
-                            bData = self.reduceDF(starForming, additionalCriteria, useStandards)
-                            bLbl = 'Star Forming'
-                        elif colorType == 'sersic':
-                            # Build elliptical query string
-                            elliptical = data.query('2.5 < n < 6')
-                            # Build spiral query string
-                            spiral = data.query('n < 2.5')
-                            # Unsure if need to reduce again. Doing it to be on the safe side.
-                            aData = self.reduceDF(elliptical, additionalCriteria, useStandards)
-                            aLbl = 'Elliptical'
-                            bData = self.reduceDF(spiral, additionalCriteria, useStandards)
-                            bLbl = 'Spiral'
-                        else:
-                            print(colorType, ' is not a valid coloring scheme!')
-                            return
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
-                        if xQuantityName == 're':
-                            aXVals, bin = self.reConvert(aData)
-                            bXVals, bin = self.reConvert(bData)
-                        else:
-                            aXVals = aData[xQuantityName].values
-                            bXVals = bData[xQuantityName].values
-                        if yQuantityName == 're':
-                            aYVals, bin = self.reConvert(aData)
-                            bYVals, bin = self.reConvert(bData)
-                        else:
-                            aYVals = aData[yQuantityName].values
-                            bYVals = bData[yQuantityName].values
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            aXVals = np.log10(aXVals)
-                            bXVals = np.log10(bXVals)
-                        if useLog[1] == True:
-                            aYVals = np.log10(aYVals)
-                            bYVals = np.log10(bYVals)
-                        # Plot passive v star-forming border in the case where we are plotting UVJ color-color
-                        if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                            self.plotPassiveLines()
-                        # generate best fit line
-                        if fitLine == True:
-                            # Generate two if plotting quiescent v star-forming
-                            if colorType == 'passive':
-                                self.MSRfit(aData, useLog, color=color1)
-                                self.MSRfit(bData, useLog, color=color2)
-                            else:
-                                self.MSRfit(data, useLog)
-                        if (clusterName != self._structClusterNames[-1]):
-                            plt.scatter(aXVals, aYVals, color=color1)
-                            plt.scatter(bXVals, bYVals, color=color2)
-                        # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
-                        else:
-                            plt.scatter(aXVals, aYVals, color=color1, label='Quiescent')
-                            plt.scatter(bXVals, bYVals, color=color2, label='Star Forming')
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            #self.plotVanDerWelLines()
-                        # Write data if running test suite
-                        if test:
-                            xA = xA + aXVals.shape[0]
-                            xB = xB + bXVals.shape[0]
-                            yA = yA + aYVals.shape[0]
-                            yB = yB + bYVals.shape[0]
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, False, data, color1, color2, plt, holdLbls=False)
+                # Update data count totals
+                xTot+=x
+                yTot+=y
             # generate best fit line
             if fitLine == True:
                 # In the case of plotting passive vs star forming galaxies, we plot two separate fit lines
@@ -1307,11 +1111,8 @@ class GOGREEN:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='spiral', color=color2)
                 else:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards)
-            # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-            #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                #self.plotVanDerWelLines()
             if test:
-                file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
+                file.write(str(xTot) +  ' ' + str(yTot) + ' ')
         else:
             print(plotType, " is not a valid plotting scheme!")
             return
