@@ -1039,7 +1039,9 @@ class GOGREEN:
                     if (yRange != None):
                         axes[i][j].set(ylim=yRange)
                     axes[i][j].set(title=currentClusterName)
-                    axes[i][j].legend()
+                    if colorType != None:
+                        # Avoid calling legend() if there are no labels
+                        axes[i][j].legend()
                     currentIndex += 1
             # Remove the 12th subplot from the figure otherwise blank axes will be displayed
             plt.delaxes(axes[3][2])
@@ -1102,6 +1104,8 @@ class GOGREEN:
                 plt.xlim(xRange[0], xRange[1])
             if (yRange != None):
                 plt.ylim(yRange[0], yRange[1])
-            plt.legend()
+            if colorType != None:
+                # Avoid calling legend() if there are no labels
+                plt.legend()
             plt.show()
     # END PLOT
