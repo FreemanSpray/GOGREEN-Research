@@ -904,6 +904,7 @@ class GOGREEN:
                     self.MSRfit(data, useLog, axes, row, col)
             # Generate the plot
             print(xQuantityName)
+            print(plot)
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
@@ -1053,7 +1054,7 @@ class GOGREEN:
                         axes[i][j].legend()
                     currentIndex += 1
             # Remove the 12th subplot from the figure otherwise blank axes will be displayed
-            plt.delaxes(axes[3][2])
+            #plt.delaxes(axes[3][2])
             # Configure the subplot spacing so axes aren't overlapping
             # These specifc values were found at:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
@@ -1092,10 +1093,10 @@ class GOGREEN:
                 data = self.reduceDF(data, additionalCriteria, useStandards)
                 # Plot depending on how the values should be colored (hold off on MSR fit lines since this needs to be handled separately for plotType 3)
                 if (clusterName != self._structClusterNames[-1]):
-                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, False, data, color1, color2, plt, holdLbls=True)
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, False, data, color1, color2, plt, axes=None, row=None, col=None, holdLbls=True)
                 # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
                 else:
-                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, False, data, color1, color2, plt, holdLbls=False)
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, False, data, color1, color2, plt, axes=None, row=None, col=None, holdLbls=False)
                 # Update data count totals
                 xTot+=x
                 yTot+=y
