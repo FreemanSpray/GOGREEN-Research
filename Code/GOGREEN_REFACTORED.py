@@ -801,12 +801,13 @@ class GOGREEN:
             memberStatus = ["all", "only", "not"]
             plotType = [1, 2, 3]
             colorType = [None, "membership", "passive", "sersic"]
-            cluster = None
             for m in memberStatus:
                 for p in plotType:
                     for c in colorType:
                         if p == 1:
                             cluster = "SpARCS1616"
+                        else:
+                            cluster = None
                         self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False, test=True, file=f)
                         self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False, test=True, file=f)
             f.close()
@@ -857,7 +858,7 @@ class GOGREEN:
                 # Build elliptical query string
                 elliptical = data.query('2.5 < n < 6')
                 # Build spiral query string
-                spiral = data.query('n < 2.5')
+                spiral = data.query('n <= 2.5')
                 # Unsure if need to reduce again. Doing it to be on the safe side.
                 aData = self.reduceDF(elliptical, additionalCriteria, useStandards)
                 aLbl = 'Elliptical'
@@ -902,6 +903,7 @@ class GOGREEN:
                 else:
                     self.MSRfit(data, useLog, axes, row, col)
             # Generate the plot
+            print(xQuantityName)
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
@@ -1017,14 +1019,21 @@ class GOGREEN:
                     if (currentIndex == len(self._structClusterNames)):
                         break
                     currentClusterName = self._structClusterNames[currentIndex]
-                    # Get all galaxies associated with this cluster
-                    data = self.getClusterGalaxies(currentClusterName)
-                    if useMembers == 'only':
+                    if useMembers == None:
+                        print("Please specify membership requirements!")
+                        return
+                    elif useMembers == 'all':
+                        # Get all galaxies associated with this cluster
+                        data = self.getClusterGalaxies(currentClusterName)
+                    elif useMembers == 'only':
                         # Reduce data to only contain galaxies classified as members
                         data = self.getMembers(currentClusterName)
-                    if useMembers == 'not':
+                    elif useMembers == 'not':
                         # Reduce data to only contain galaxies not classified as members
                         data = self.getNonMembers(currentClusterName)
+                    else:
+                        print(useMembers, " is not a valid membership requirement!")
+                        return
                     # Apply other specified reducing constraints
                     data = self.reduceDF(data, additionalCriteria, useStandards)
                     # Plot data
@@ -1061,12 +1070,24 @@ class GOGREEN:
             for clusterName in self._structClusterNames:
                 # Get all galaxies associated with this cluster
                 data = self.getClusterGalaxies(clusterName)
-                if useMembers == 'only':
+                if clusterName == None:
+                    print("No cluster name provided!")
+                    return
+                if useMembers == None:
+                    print("Please specify membership requirements!")
+                    return
+                elif useMembers == 'all':
+                    # Get all galaxies associated with this cluster
+                    data = self.getClusterGalaxies(clusterName)
+                elif useMembers == 'only':
                     # Reduce data to only contain galaxies classified as members
                     data = self.getMembers(clusterName)
-                if useMembers == 'not':
+                elif useMembers == 'not':
                     # Reduce data to only contain galaxies not classified as members
                     data = self.getNonMembers(clusterName)
+                else:
+                    print(useMembers, " is not a valid membership requirement!")
+                    return
                 # Apply other specified reducing constraints
                 data = self.reduceDF(data, additionalCriteria, useStandards)
                 # Plot depending on how the values should be colored (hold off on MSR fit lines since this needs to be handled separately for plotType 3)
