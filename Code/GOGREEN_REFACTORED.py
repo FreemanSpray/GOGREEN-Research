@@ -198,8 +198,6 @@ class GOGREEN:
         if useStandards:
             for criteria in self.standardCriteria:
                 frame = frame.query(criteria)
-        # Remove data points that would cause an error (it's not clear to me whether this is necessary. It seems as though standard criteria does not catch nan cases)
-        #frame = self.cutBadData(frame)
         return frame
     # END REDUCEDF
         
@@ -458,7 +456,7 @@ class GOGREEN:
                     xline = np.array([xMin, xMax])
                     yline = b + m*xline # Equivalent operation: yline = s(xline)
                     # Plot curve
-                    plot.plot(xline, yline, color='green')
+                    #plot.plot(xline, yline, color='green')
                     plotted = True
                 except RuntimeError:
                     print("caught runtime error")
@@ -484,27 +482,6 @@ class GOGREEN:
         plot.plot(xGrid, yBots, color='blue')
         plot.fill_between(xGrid, yBots, yTops) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
-
-    def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
-        """
-        cutBadData removes all data points from a data set for which the mass value is missing
-        
-        :param masses    :     List containing the mass values of the data set
-                                Default: None
-        :param sizes    :      List containing the size values corresponding to each mass in the data set
-                                Default: None
-        :return: masses and sizes are returned minus the bad data points
-        """
-        badDataIndices = []
-        for i in range(0, len(data['Mstellar'])):
-            # Check if there are any remaining missing values (in the rare case where there is no Mstellar value, no re value, or there are no redshift values)
-            if np.isnan(data['Mstellar'].values[i]) or np.isnan(data['re'].values[i]) or (np.isnan(data['zspec'].values[i]) and np.isnan(data['zphot'].values[i])):
-                # Add the index of this data point to the list of those to be removed once all data points have been checked.
-                badDataIndices.append(i)
-        for j in range(len(badDataIndices) - 1, -1, -1):
-            # Iterate through the array of indices, removing the data at these indices from both axis arrays.
-            data = pd.concat([data[:badDataIndices[j]], data[badDataIndices[j]+1:]])
-        return data
 
     def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
         """
@@ -915,7 +892,7 @@ class GOGREEN:
                 bYVals = np.log10(bYVals)
             # Plot passive v star-forming border in the case where we are plotting UVJ color-color
             if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                self.plotPassiveLines()
+                self.plotPassiveLines(axes, row, col)
             # generate best fit line
             if fitLine == True:
                 # Generate two if plotting quiescent v star-forming
@@ -923,11 +900,11 @@ class GOGREEN:
                     self.MSRfit(aData, useLog, axes, row, col, color=color1)
                     self.MSRfit(bData, useLog, axes, row, col, color=color2)
                 else:
-                    self.MSRfit(data, axes, row, col, useLog)
+                    self.MSRfit(data, useLog, axes, row, col)
             # Generate the plot
-            plot.scatter(aXVals, aYVals, color=color1, label=aLbl)
+            plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if colorType != None:
-                plot.scatter(bXVals, bYVals, color=color2, label=bLbl)
+                plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
             # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
             #if xQuantityName == 'Mstellar' and yQuantityName == 're':
                 #self.plotVanDerWelLines()
