@@ -808,8 +808,17 @@ class GOGREEN:
                             cluster = "SpARCS1616"
                         else:
                             cluster = None
-                        self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False, test=True, file=f)
-                        self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False, test=True, file=f)
+                        xCountMSR, yCountMSR = self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xCountUVJ, yCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
+                        if xCountMSR != yCountMSR or xCountUVJ != yCountUVJ:
+                            print("test failed. X and Y data counts do not agree.")
+                            return
+                        if xCountMSR != xCountUVJ:
+                            print("test failed. MSR and UVJ counts do not agree.")
+                            return
+                        # Write data counts if running test suite
+                        f.write(str(xCountMSR) + ' ')
+            clusters = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
             f.close()
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'r')
             testOutput = f.read()
@@ -925,7 +934,7 @@ class GOGREEN:
 
 
     def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None, colors:list=None, 
-        useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False, file:__file__=None):
+        useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -1001,10 +1010,7 @@ class GOGREEN:
             # Apply other specified reducing constraints
             data = self.reduceDF(data, additionalCriteria, useStandards)
             # Plot data
-            x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt)
-            # Write data counts if running test suite
-            if test:
-                file.write(str(x) +  ' ' + str(y) + ' ')
+            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt)
         # Plot all clusters individually in a subplot
         elif plotType == 2:
             # Initialize data count totals (used when running test suite)
@@ -1059,9 +1065,6 @@ class GOGREEN:
             # These specifc values were found at:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
-            # Write data counts if running test suite
-            if test:
-                file.write(str(xTot) +  ' ' + str(yTot) + ' ')
         # Plot all clusters on the same plot            
         elif plotType == 3:
             # Initialize data count totals (used when running test suite)
@@ -1112,8 +1115,6 @@ class GOGREEN:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='spiral', color=color2)
                 else:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards)
-            if test:
-                file.write(str(xTot) +  ' ' + str(yTot) + ' ')
         else:
             print(plotType, " is not a valid plotting scheme!")
             return
@@ -1130,4 +1131,5 @@ class GOGREEN:
                 # Avoid calling legend() if there are no labels
                 plt.legend()
             plt.show()
+        return (xTot, yTot)
     # END PLOT
