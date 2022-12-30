@@ -818,7 +818,19 @@ class GOGREEN:
                             return
                         # Write data counts if running test suite
                         f.write(str(xCountMSR) + ' ')
-            clusters = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
+            clusterNames = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
+            xTot = 0
+            f.write('\n')
+            for cluster in clusterNames:
+                xCount, _ = self.plot('Mstellar', 're', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                f.write(str(xCount) + ' ')
+                xTot+=xCount
+            f.write('\n' + str(xTot) + ' ')
+            xTotExpected, _ = self.plot('Mstellar', 're', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            f.write(str(xTotExpected))
+            if xTot != xTotExpected:
+                print("test failed. Totaled Individual and combined cluster counts do not agree.")
+                return
             f.close()
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'r')
             testOutput = f.read()
@@ -829,12 +841,35 @@ class GOGREEN:
             if testOutput == expectedOutput:
                 print("test passed.")
                 return
-            print("test failed.")
+            print("test failed due to unspecified error case.")
     # END TEST
     
     def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, additionalCriteria:list=None, colorType:str=None, useStandards:bool=True, useLog:list=[False,False], fitLine:bool=False, 
         data:pd.DataFrame=None, color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, holdLbls:bool=False):
-        # Arbitrary establishment of variables for non-coloring case
+            """
+            Helper function called by plot. Handles the plotting of data.
+                
+            :param xQuantityName:      Name of the column whose values are to be used as the x
+            :param yQuantityName:      Name of the column whose values are to be used as the y
+            :param additionalCriteria: List of desired criteria the plotted galaxies should meet
+                                        Default: None
+            :param colorType:          Specifies how to color code the plotted galaxies
+                                        Default: None
+                                        Value:   'membership' - spectroscopic member vs photometric member
+                                        Value:   'passive' - passive vs star forming
+            :param useStandards:       Flag to indicate whether the standard search criteria should be applied
+                                        Default: True
+            :param useLog:             Flag to indicate whether the x- or y-axis should be in log scale
+                                        Default: [False,False] - neither axis in log scale
+                                        Value:   [False,True] - y axis in log scale
+                                        Value:   [True,False] - x axis in log scale
+                                        Value:   [True,True] - both axis in log scale
+            :param fitLine:             Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
+                                        (note: the default x and y will be in log, however specifically selected values will correspond to the useLog list)
+                                        (note: not currently configured to work with plot type 2)
+            :return:                  The generated plot(s) will be displayed
+            """
+            # Arbitrary establishment of variables for non-coloring case
             aData = data
             bData = data
             aLbl = None
@@ -882,14 +917,14 @@ class GOGREEN:
                 bLbl = None
             # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
             if xQuantityName == 're':
-                aXVals, bin = self.reConvert(aData)
-                bXVals, bin = self.reConvert(bData)
+                aXVals, _ = self.reConvert(aData)
+                bXVals, _ = self.reConvert(bData)
             else:
                 aXVals = aData[xQuantityName].values
                 bXVals = bData[xQuantityName].values
             if yQuantityName == 're':
-                aYVals, bin = self.reConvert(aData)
-                bYVals, bin = self.reConvert(bData)
+                aYVals, _ = self.reConvert(aData)
+                bYVals, _ = self.reConvert(bData)
             else:
                 aYVals = aData[yQuantityName].values
                 bYVals = bData[yQuantityName].values
