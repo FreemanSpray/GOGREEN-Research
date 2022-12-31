@@ -780,6 +780,12 @@ class GOGREEN:
     # END MAKETABLE
 
     def testPlots(self):
+        """
+        Makes a series of test plots, stores and analyzes the data counts resulting from each plot to judge the accuracy of the plot() function.
+
+        :post:      counts are written to file C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt
+        """
+        # Establish criteria
         searchCriteria = [
             'Star == 0',
             'K_flag == 0',
@@ -796,11 +802,13 @@ class GOGREEN:
         with warnings.catch_warnings(): #suppressing depracation warnings for readability purposes
             warnings.simplefilter("ignore")
             warnings.warn("deprecated", DeprecationWarning)
-            
+            # Open file for writing
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'w')
+            # Establish variables for first test
             memberStatus = ["all", "only", "not"]
             plotType = [1, 2, 3]
             colorType = [None, "membership", "passive", "sersic"]
+            # Plot MSR and UVJ plots for each variable
             for m in memberStatus:
                 for p in plotType:
                     for c in colorType:
@@ -810,23 +818,31 @@ class GOGREEN:
                             cluster = None
                         xCountMSR, yCountMSR = self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                         xCountUVJ, yCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
+                        # End test early (and with specific error) if major discrepency is found
                         if xCountMSR != yCountMSR or xCountUVJ != yCountUVJ:
                             print("test failed. X and Y data counts do not agree.")
                             return
                         if xCountMSR != xCountUVJ:
                             print("test failed. MSR and UVJ counts do not agree.")
                             return
-                        # Write data counts if running test suite
+                        # Write data count (all four return values will be the same if this line is reached so we only need to write once)
                         f.write(str(xCountMSR) + ' ')
+            # Establish variables for second test
             clusterNames = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
             xTot = 0
+            # Seperate results with newline
             f.write('\n')
+            # Plot MSR plot for each cluster
             for cluster in clusterNames:
                 xCount, _ = self.plot('Mstellar', 're', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                # Write data count
                 f.write(str(xCount) + ' ')
+                # Add value to total
                 xTot+=xCount
+            # Write total count on another newline
             f.write('\n' + str(xTot) + ' ')
             xTotExpected, _ = self.plot('Mstellar', 're', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            # Write expected total
             f.write(str(xTotExpected))
             if xTot != xTotExpected:
                 print("test failed. Totaled Individual and combined cluster counts do not agree.")
@@ -864,10 +880,26 @@ class GOGREEN:
                                         Value:   [False,True] - y axis in log scale
                                         Value:   [True,False] - x axis in log scale
                                         Value:   [True,True] - both axis in log scale
-            :param fitLine:             Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
+            :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
                                         (note: the default x and y will be in log, however specifically selected values will correspond to the useLog list)
                                         (note: not currently configured to work with plot type 2)
-            :return:                  The generated plot(s) will be displayed
+            :param data:               Set of data points to be plotted. 
+            :param color1:             Specifies what color should be used when plotting first type of data
+                                        Value:   (r,g,b)
+            :param color2:             Specifies what color should be used when plotting first type of data
+                                        (note: unused when colorType is None)
+                                        Value:   (r,g,b)
+            :param plot:               The plot on which the data should be plotted.
+                                        Value: will be either the module 'plt' or a subplot
+            :param axes:               The array of subplots created when the plotType is set to 2.
+                                        Default: None
+            :param row:                Specifies the row of the 2D array of subplots. For use when axes is not None.
+                                        Default: None
+            :param col:                Specifies the column of the 2D array of subplots. For use when axes is not None.
+                                        Default: None
+            :param holdLbls:           Indicates whether or not labels should be plotted. Needed when plotting multiple times on the same plot.
+            :post:                     The generated plot(s) will be displayed
+            :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points
             """
             # Arbitrary establishment of variables for non-coloring case
             aData = data
@@ -1012,7 +1044,8 @@ class GOGREEN:
         :param fitLine:             Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
                                      (note: the default x and y will be in log, however specifically selected values will correspond to the useLog list)
                                      (note: not currently configured to work with plot type 2)
-        :return:                  The generated plot(s) will be displayed
+        :post:                      The generated plot(s) will be displayed
+        :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points
         """
         # Check if plot colors were provided by the user
         if (colors != None):
