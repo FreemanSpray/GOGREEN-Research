@@ -816,7 +816,7 @@ class GOGREEN:
                             cluster = "SpARCS1616"
                         else:
                             cluster = None
-                        xCountMSR, yCountMSR = self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xCountMSR, yCountMSR = self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                         xCountUVJ, yCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
                         # End test early (and with specific error) if major discrepency is found
                         if xCountMSR != yCountMSR or xCountUVJ != yCountUVJ:
@@ -834,7 +834,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xCount, _ = self.plot('Mstellar', 're', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xCount, _ = self.plot('Mstellar', 're', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write data count
                 f.write(str(xCount) + ' ')
                 # Add value to total
@@ -842,7 +842,28 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n' + str(xTot) + ' ')
             # Plot MSR plot for all clusters combined
-            xTotExpected, _ = self.plot('Mstellar', 're', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xTotExpected, _ = self.plot('Mstellar', 're', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            # Write expected total
+            f.write(str(xTotExpected))
+            if xTot != xTotExpected:
+                print("test failed. Totaled Individual and combined cluster counts do not agree.")
+                return
+            # Establish variables for third test
+            clusterNames = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
+            xTot = 0
+            # Seperate results with newline
+            f.write('\n')
+            # Plot MSR plot for each cluster
+            for cluster in clusterNames:
+                xCount, _ = self.plot('Mstellar', 're', plotType=1, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                # Write data count
+                f.write(str(xCount) + ' ')
+                # Add value to total
+                xTot+=xCount
+            # Write total count on another newline
+            f.write('\n' + str(xTot) + ' ')
+            # Plot MSR plot for all clusters combined
+            xTotExpected, _ = self.plot('Mstellar', 're', plotType=3, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write(str(xTotExpected))
             if xTot != xTotExpected:
