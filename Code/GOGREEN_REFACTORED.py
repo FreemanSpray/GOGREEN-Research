@@ -456,7 +456,7 @@ class GOGREEN:
                     xline = np.array([xMin, xMax])
                     yline = b + m*xline # Equivalent operation: yline = s(xline)
                     # Plot curve
-                    #plot.plot(xline, yline, color='green')
+                    #plot.plot(xline, yline, color='green', alpha=0.6)
                     plotted = True
                 except RuntimeError:
                     print("caught runtime error")
@@ -841,6 +841,7 @@ class GOGREEN:
                 xTot+=xCount
             # Write total count on another newline
             f.write('\n' + str(xTot) + ' ')
+            # Plot MSR plot for all clusters combined
             xTotExpected, _ = self.plot('Mstellar', 're', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write(str(xTotExpected))
@@ -979,8 +980,6 @@ class GOGREEN:
                 else:
                     self.MSRfit(data, useLog, axes, row, col)
             # Generate the plot
-            print(xQuantityName)
-            print(plot)
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
@@ -1047,14 +1046,20 @@ class GOGREEN:
         :post:                      The generated plot(s) will be displayed
         :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points
         """
+        # Initialize plot
+        plt.figure(figsize=(8,6))
         # Check if plot colors were provided by the user
-        if (colors != None):
+        if colors != None:
             color1 = colors[0]
             color2 = colors[1]
         # If not, generate random colors
         else:
-            color1 = [1, rng.random(), rng.random()]
-            color2 = [0, rng.random(), rng.random()]
+            if colorType == 'passive':
+                color1 = [1, 0, 0]
+                color2 = [0, 0, 1]
+            else:
+                color1 = [0, 1, 0.5]
+                color2 = [1, 0.5, 0]
         # Plot only the cluster specified
         if plotType == 1:
             if clusterName == None:
@@ -1128,7 +1133,7 @@ class GOGREEN:
                         axes[i][j].legend()
                     currentIndex += 1
             # Remove the 12th subplot from the figure otherwise blank axes will be displayed
-            #plt.delaxes(axes[3][2])
+            plt.delaxes(axes[3][2])
             # Configure the subplot spacing so axes aren't overlapping
             # These specifc values were found at:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
