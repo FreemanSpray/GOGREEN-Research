@@ -250,19 +250,19 @@ class GOGREEN:
         """
         
         # Generate the data used to plot the line
-        logA = 0.7
+        A = pow(10, 0.7)
         alpha = 0.22
-        Mstellar = np.array([31622800000000000000000000, 3162280000000000000000000000])
-        Re = np.array([-1.5, 1.5])
-        xValues = np.array([alpha * np.log(i / (5 * np.float_power(10, 10))) for i in Mstellar])
-        #print(xValues)
+        MstellarRange = np.array([pow(10, 9.5), pow(10, 11.5)])
+        ReRange = np.array([pow(10, -1.5), pow(10, 1.5)])
+        xValues = np.array([A * pow((i / (5 * np.float_power(10, 10))), alpha) for i in MstellarRange])
+        print(xValues)
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None:
-                axes[row][col].plot(xValues, Re, linestyle='dashed', color='black')
+                axes[row][col].plot(xValues, ReRange, linestyle='dashed', color='black')
                 return
         # Else plot normally
-        plt.plot(xValues, Re, linestyle='dashed', color='black')
+        plt.plot(xValues, ReRange, linestyle='dashed', color='black')
     #END PLOTVANDERWELLINES
 
     def reConvert(self, data:pd.DataFrame) -> tuple[list, list]:
@@ -1006,7 +1006,7 @@ class GOGREEN:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
             # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
             #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                #self.plotVanDerWelLines()
+                self.plotVanDerWelLines()
             # Return data counts (used when running test suite)
             xA = aXVals.shape[0]
             yA = aYVals.shape[0]
