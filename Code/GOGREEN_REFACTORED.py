@@ -316,10 +316,10 @@ class GOGREEN:
                                      Default: True
         :param typeRestrict:        Flag to indicate whether data should be restricted based on SFR (only necessary when allData is True)
                                      Default: None
-                                     Value:   'passive' - only passive galaxies should be considered.
-                                     Value:   'starForming' - only star forming galaxies should be considered.
-                                     Value:   'elliptical' - only galaxies with 2.5 < n < 6 should be considered.
-                                     Value:   'spiral' - only galaxies with n < 2.5 should be considered.
+                                     Value:   'Quiescent' - only passive galaxies should be considered.
+                                     Value:   'Star-Forming' - only star forming galaxies should be considered.
+                                     Value:   'Elliptical' - only galaxies with 2.5 < n < 6 should be considered.
+                                     Value:   'Spiral' - only galaxies with n < 2.5 should be considered.
         :param color1:             The color the fit line should be.
                                     Default: 'black'       
         :return   :
@@ -342,17 +342,26 @@ class GOGREEN:
                     data = data.append(self.getClusterGalaxies(clusterName))
             # Apply other specified reducing constraints
             data = self.reduceDF(data, additionalCriteria, useStandards)
-            # Handle case where only passive galaxies out of all data need to plotted.
-            if typeRestrict == 'passive':
+            # Establish colors
+            if typeRestrict == 'Quiescent':
                 data = data.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
+                color = 'red'
             # Handling case where only star forming galaxies out of all data need to plotted.
-            if typeRestrict == 'starForming':
+            elif typeRestrict == 'Star-Forming':
                 data = data.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-            if typeRestrict == 'elliptical':
+                color = 'blue'
+            elif typeRestrict == 'Elliptical':
                 data = data.query('2.5 < n < 6')
+                color = 'green'
             # Handling case where only star forming galaxies out of all data need to plotted.
-            if typeRestrict == 'spiral':
+            elif typeRestrict == 'Spiral':
                 data = data.query('n < 2.5')
+                color = 'orange'
+        # Establish label
+        if typeRestrict == None:
+            lbl = "stellar mass-size relation trend"
+        else:
+            lbl = typeRestrict + " stellar mass-size relation trend"
         # Convert all effective radii and associated errors from units of arcsec to kpc using their spectroscopic redshifts
         size, sigmas = self.reConvert(data)
         # Extract mass values
@@ -380,40 +389,44 @@ class GOGREEN:
             # Check for subplots
             if axes[row][col] != None:
                 # Bootstrapping calculation
-                self.bootstrap(xFitData, yFitData, weights, axes, row, col)
+                self.bootstrap(xFitData, yFitData, weights, axes, row, col, typeRestrict)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
                     axes[row][col].plot(xFitData, s(xFitData), color='white', linewidth=4)
                 # Plot the best fit line
-                axes[row][col].plot(xFitData, s(xFitData), color='red')
-                #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
+                axes[row][col].plot(xFitData, s(xFitData), color=color, label=lbl)
                 return
         # Bootstrapping calculation
-        self.bootstrap(xFitData, yFitData, weights, axes, row, col)
+        self.bootstrap(xFitData, yFitData, weights, axes, row, col, typeRestrict)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
             plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
         # Plot the best fit line
-        plt.plot(xFitData, s(xFitData), color='red')
-        #plt.plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
+        plt.plot(xFitData, s(xFitData), color=color, label=lbl)
     # END MSRFIT
 
-    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None,):
+    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None, typeRestrict:str=None):
         """
         bootstrap obtains a measure of error of the line-fitting equation ...
         
-        :param x     :    List containing the mass values of the data set
-                                Default: None
-        :param y     :    List containing the size values corresponding to each mass value in the data set
-                                Default: None
-        :param error:    List containing the error values corresponding to each size value in the data set
-                                Default: None
+        :param x:                   List containing the mass values of the data set
+                                     Default: None
+        :param y:                   List containing the size values corresponding to each mass value in the data set
+                                     Default: None
+        :param error:               List containing the error values corresponding to each size value in the data set
+                                     Default: None
         :param axes:                The array of subplots created when the plotType is set to 2.
                                      Default: None
         :param row:                 Specifies the row of the 2D array of subplots. For use when axes is not None.
                                      Default: None
         :param col:                 Specifies the column of the 2D array of subplots. For use when axes is not None.
                                      Default: None
+        :param typeRestrict:        Flag to indicate what color should be used, depending on type of data being plotted
+                                     Default: None
+                                     Value:   'Quiescent' - only passive galaxies are being considered.
+                                     Value:   'Star-Forming' - only star forming galaxies are being considered.
+                                     Value:   'Elliptical' - only galaxies with 2.5 < n < 6 are being considered.
+                                     Value:   'Spiral' - only galaxies with n < 2.5 are being considered.
         :return      :    ...
         """
         # Establish type of plot
@@ -476,10 +489,21 @@ class GOGREEN:
             # Calculate 68% confidence interval for the ith grid coordinate
             yTops[i] = np.percentile(yGrid[i], 84)
             yBots[i] = np.percentile(yGrid[i], 16)
+        # Determine color to be used
+        # Useful tool: https://www.rapidtables.com/web/color/RGB_Color.html
+        if typeRestrict == 'Quiescent':
+            color = [0.5, 0, 0] # darker red
+        elif typeRestrict == 'Elliptical':
+            color = [0, 0.5, 0] # darker green
+        elif typeRestrict == 'Spiral':
+            color = [1, 0.5, 0] # lighter orange
+        # star-forming and default case
+        else:
+            color = [0, 0, 0.5] # darker blue
         # Plot curves on top and bottom of intervals
-        plot.plot(xGrid, yTops, color='blue')
-        plot.plot(xGrid, yBots, color='blue')
-        plot.fill_between(xGrid, yBots, yTops) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
+        plot.plot(xGrid, yTops, color=color)
+        plot.plot(xGrid, yBots, color=color)
+        plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
     def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
@@ -1200,12 +1224,12 @@ class GOGREEN:
             if fitLine == True:
                 # In the case of plotting passive vs star forming galaxies, we plot two separate fit lines
                 if colorType == 'passive':
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='passive', color=color1)
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='starForming', color=color2)
+                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='Quiescent', color=color1)
+                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='Star-Forming', color=color2)
                 # In the case of plotting elliptical vs spiral inclined galaxies (based on Sersic index), we plot two separate fit lines NOTE: Handling of these cases not yet implemented in MSRfit()
                 elif colorType == 'sersic':
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='elliptical', color=color1)
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='spiral', color=color2)
+                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='Elliptical', color=color1)
+                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='Spiral', color=color2)
                 else:
                     self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards)
         else:
