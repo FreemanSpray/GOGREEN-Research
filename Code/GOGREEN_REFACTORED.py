@@ -252,17 +252,16 @@ class GOGREEN:
         # Generate the data used to plot the line
         A = pow(10, 0.7)
         alpha = 0.22
-        MstellarRange = np.array([pow(10, 9.5), pow(10, 11.5)])
-        ReRange = np.array([pow(10, -1.5), pow(10, 1.5)])
-        xValues = np.array([A * pow((i / (5 * np.float_power(10, 10))), alpha) for i in MstellarRange])
-        print(xValues)
+        xVals = np.array([9.5, 11.5])
+        MstellarRange = pow(10, xVals)
+        yVals = np.log10(np.array([A * pow((i / (5 * np.float_power(10, 10))), alpha) for i in MstellarRange]))
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None:
-                axes[row][col].plot(xValues, ReRange, linestyle='dashed', color='black')
+                axes[row][col].plot(xVals, yVals, linestyle='dashed', color='black')
                 return
         # Else plot normally
-        plt.plot(xValues, ReRange, linestyle='dashed', color='black')
+        plt.plot(xVals, yVals, linestyle='dashed', color='black')
     #END PLOTVANDERWELLINES
 
     def reConvert(self, data:pd.DataFrame) -> tuple[list, list]:
