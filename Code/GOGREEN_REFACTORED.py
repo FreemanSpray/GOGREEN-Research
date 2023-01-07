@@ -975,6 +975,45 @@ class GOGREEN:
                 aLbl = 'Quiescent'
                 bData = self.reduceDF(starForming, additionalCriteria, useStandards)
                 bLbl = 'Star Forming'
+            elif colorType == 'GV':
+                # Build gv query string (from McNab et al 2021)
+                gvQuery = '(2 * VMINJ + 1.1 <= nuv_tot - V_tot) and (nuv_tot - V_tot <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
+                # Build non-gv query string
+                otherQuery = '(2 * VMINJ + 1.1 > nuv_tot - V_tot) or (nuv_tot - V_tot > 2 * VMINJ + 1.6)'
+                # Extract desired quantities from data
+                greenValley = data.query(gvQuery)
+                other = data.query(otherQuery)
+                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                aData = self.reduceDF(greenValley, additionalCriteria, useStandards)
+                aLbl = 'Green Valley'
+                bData = self.reduceDF(other, additionalCriteria, useStandards)
+                bLbl = 'Other'
+            elif colorType == 'BQ':
+                # Build bq query string (from McNab et al 2021)
+                bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) or ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 
+                # Build non-bq query string
+                otherQuery = '((VMINJ + 0.45 > UMINV) or (UMINV > VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 > UMINV) or (UMINV > -1.25 * VMINJ + 2.7))'
+                # Extract desired quantities from data
+                blueQuiescent = data.query(bqQuery)
+                other = data.query(otherQuery)
+                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                aData = self.reduceDF(blueQuiescent, additionalCriteria, useStandards)
+                aLbl = 'Blue Quiescent'
+                bData = self.reduceDF(other, additionalCriteria, useStandards)
+                bLbl = 'Other'
+            elif colorType == 'PSB': # we need to query the redshift catalogue instead of the structural catalogue, as this is the catalogue with d4000 and delta_BIC values
+                # Build gv query string (from McNab et al 2021)
+                gvQuery = 'd4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
+                # Build non-gv query string
+                otherQuery = 'd4000 >= 1.45 or delta_BIC >= -10'
+                # Extract desired quantities from data
+                greenValley = data.query(gvQuery)
+                other = data.query(otherQuery)
+                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
+                aData = self.reduceDF(greenValley, additionalCriteria, useStandards)
+                aLbl = 'Post-starburst'
+                bData = self.reduceDF(other, additionalCriteria, useStandards)
+                bLbl = 'Other' 
             elif colorType == 'sersic':
                 # Build elliptical query string
                 elliptical = data.query('2.5 < n < 6')
