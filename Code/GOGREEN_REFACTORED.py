@@ -388,8 +388,7 @@ class GOGREEN:
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
-        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights) # I have no idea what rules this return value conforms to. the man page for fit() calls it a series. It is callable as a function. The syntax displayed is not familiar to me (x**1).
-        #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=xFitData, ydata=yFitData, p0=[0, 0], sigma=sigmas)
+        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -408,6 +407,10 @@ class GOGREEN:
             plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
         # Plot the best fit line
         plt.plot(xFitData, s(xFitData), color=color, label=lbl)
+        coefs = s.convert().coef
+        b = coefs[0]
+        m = coefs[1]
+        return m, b
     # END MSRFIT
 
     def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None, typeRestrict:str=None):
@@ -511,7 +514,7 @@ class GOGREEN:
         plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
-    def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
+    def getRatio(self, x:float=None, y:float=None) -> list:
         """
         Calculates the ratio of member over non-member galaxies (for both passive and star-forming). Also has an option to plot the trendlines for these 4 categories
 
@@ -528,91 +531,33 @@ class GOGREEN:
                             Default: None
         :return: size 2 list of the two ratios of member over non-member galaxies (first element is for quiescent, second is for star-forming)
         """
-        # Set an initial value to append to.
-        memberData = pd.DataFrame()
-        nonMemberData = pd.DataFrame()
-        for clusterName  in self._structClusterNames:
-            # Get data for this cluster for galaxies classified as members
-            memberData = memberData.append(self.getMembers(clusterName))
-            nonMemberData = nonMemberData.append(self.getNonMembers(clusterName))
-        # Apply other specified reducing constraints
-        memberData = self.reduceDF(memberData, None, True)
-        nonMemberData = self.reduceDF(nonMemberData, None, True)
-        # Handle case where only passive galaxies out of all data need to plotted.
-        if category == 'SF':
-            # Separate data sets by SFR
-            memberDataQ = memberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
-            memberDataSF = memberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-            nonMemberDataQ = nonMemberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
-            nonMemberDataSF = nonMemberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-            # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-            memberSizeQ = self.reConvert(memberDataQ)
-            memberSizeSF = self.reConvert(memberDataSF)
-            nonMemberSizeQ = self.reConvert(nonMemberDataQ)
-            nonMemberSizeSF = self.reConvert(nonMemberDataSF)
-            # Extract all mass values
-            memberMassQ = memberDataQ['Mstellar'].values
-            memberMassSF = memberDataSF['Mstellar'].values
-            nonMemberMassQ = nonMemberDataQ['Mstellar'].values
-            nonMemberMassSF = nonMemberDataSF['Mstellar'].values
-            # Cut out data points that will cause an error
-            memberMassQ, memberSizeQ = self.cutBadData(memberMassQ, memberSizeQ)
-            memberMassSF, memberSizeSF = self.cutBadData(memberMassSF, memberSizeSF)
-            nonMemberMassQ, nonMemberSizeQ = self.cutBadData(nonMemberMassQ, nonMemberSizeQ)
-            nonMemberMassSF, nonMemberSizeSF = self.cutBadData(nonMemberMassSF, nonMemberSizeSF)
-            # Convert to log
-            memberMassQ = np.log10(memberMassQ)
-            memberSizeQ = np.log10(memberSizeQ)
-            memberMassSF = np.log10(memberMassSF)
-            memberSizeSF = np.log10(memberSizeSF)
-            nonMemberMassQ = np.log10(nonMemberMassQ)
-            nonMemberSizeQ = np.log10(nonMemberSizeQ)
-            nonMemberMassSF = np.log10(nonMemberMassSF)
-            nonMemberSizeSF = np.log10(nonMemberSizeSF)
-            # Calculate slope and intercept for all 4 data sets
-            mMemberQ, bMemberQ = np.polyfit(memberMassQ, memberSizeQ, 1)
-            mMemberSF, bMemberSF = np.polyfit(memberMassSF, memberSizeSF, 1)
-            mNonMemberQ, bNonMemberQ = np.polyfit(nonMemberMassQ, nonMemberSizeQ, 1)
-            mNonMemberSF, bNonMemberSF = np.polyfit(nonMemberMassSF, nonMemberSizeSF, 1)
-            # Plot trendlines together
-            if plotLines:
-                plt.plot(memberMassQ, mMemberQ * memberMassQ + bMemberQ, label='quiescent members')
-                plt.plot(memberMassSF, mMemberSF * memberMassSF + bMemberSF, label='star-forming members')
-                plt.plot(nonMemberMassQ, mNonMemberQ * nonMemberMassQ + bNonMemberQ, label='quiescent non-members')
-                plt.plot(nonMemberMassSF, mNonMemberSF * nonMemberMassSF + bNonMemberSF, label='star-forming non-members')
-                plt.legend()
-                if xRange != None:
-                    if len(xRange) > 1:
-                        plt.xlim(xRange[0], xRange[1])
-                if yRange != None:
-                    if len(yRange) > 1:
-                        plt.ylim(yRange[0], yRange[1])
-                plt.xlabel('log(Mstellar)')
-                plt.ylabel('log(Re)')
-            if x != None:
-                # Get ratios at a certain x value
-                pointMemberQ = x*mMemberQ + bMemberQ
-                pointMemberSF = x*mMemberSF + bMemberSF 
-                pointNonMemberQ = x*mNonMemberQ + bNonMemberQ 
-                pointNonMemberSF = x*mNonMemberSF + bNonMemberSF
-                ratioQ = pointMemberQ/pointNonMemberQ
-                ratioSF = pointMemberSF/pointNonMemberSF
-                return [ratioQ, ratioSF]
-            elif y != None:
-                # Get ratios at a certain y value
-                pointMemberQ = (y/mMemberQ) - (bMemberQ/mMemberQ)
-                pointMemberSF = (y/mMemberSF) - (bMemberSF/mMemberSF)
-                pointNonMemberQ = (y/mNonMemberQ) - (bNonMemberQ/mNonMemberQ) 
-                pointNonMemberSF = (y/mNonMemberSF) - (bNonMemberSF/mNonMemberSF) 
-                ratioQ = pointMemberQ/pointNonMemberQ
-                ratioSF = pointMemberSF/pointNonMemberSF
-                return [ratioQ, ratioSF]
-            else:
-                print("No point of comparison provided")
-                return [-1]     
+        # Calculate slope and intercept for all 4 data sets
+        mMemberQ, bMemberQ = self.MSRfit(data=None, allData=True, useMembers='only', typeRestrict='Quiescent')
+        mMemberSF, bMemberSF = self.MSRfit(data=None, allData=True, useMembers='only', typeRestrict='Star-Forming')
+        mNonMemberQ, bNonMemberQ = self.MSRfit(data=None, allData=True, useMembers='not', typeRestrict='Quiescent')
+        mNonMemberSF, bNonMemberSF = self.MSRfit(data=None, allData=True, useMembers='not', typeRestrict='Star-Forming')
+        plt.legend()
+        if x != None:
+            # Get ratios at a certain x value
+            pointMemberQ = x*mMemberQ + bMemberQ
+            pointMemberSF = x*mMemberSF + bMemberSF 
+            pointNonMemberQ = x*mNonMemberQ + bNonMemberQ 
+            pointNonMemberSF = x*mNonMemberSF + bNonMemberSF
+            ratioQ = pointMemberQ/pointNonMemberQ
+            ratioSF = pointMemberSF/pointNonMemberSF
+            return [ratioQ, ratioSF]
+        elif y != None:
+            # Get ratios at a certain y value
+            pointMemberQ = (y/mMemberQ) - (bMemberQ/mMemberQ)
+            pointMemberSF = (y/mMemberSF) - (bMemberSF/mMemberSF)
+            pointNonMemberQ = (y/mNonMemberQ) - (bNonMemberQ/mNonMemberQ) 
+            pointNonMemberSF = (y/mNonMemberSF) - (bNonMemberSF/mNonMemberSF) 
+            ratioQ = pointMemberQ/pointNonMemberQ
+            ratioSF = pointMemberSF/pointNonMemberSF
+            return [ratioQ, ratioSF]
         else:
-            print(category + " is not a valid category")
-            return [-1]
+            print("No point of comparison provided")
+            return [-1]     
     #END GETRATIO
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
