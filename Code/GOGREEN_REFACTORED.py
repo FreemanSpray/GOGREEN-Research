@@ -212,6 +212,11 @@ class GOGREEN:
         return self.catalog[self.catalog['Cluster'] == clusterName]
     # END GETCLUSTERGALAXIES
 
+    def convertData(self, source:pd.DataFrame, target:pd.DataFrame) -> pd.DataFrame:
+        ret = target[target['cPHOTID'].isin(source['cPHOTID'])]
+        return ret
+    # END convertData
+
     def plotPassiveLines(self, axes:list=None, row:int=None, col:int=None):
         """
         plotPassiveLines (private method) draws the recognized boundary between passive and star-forming galaxies on UVJ plots
@@ -1001,16 +1006,20 @@ class GOGREEN:
                 aLbl = 'Blue Quiescent'
                 bData = self.reduceDF(other, additionalCriteria, useStandards)
                 bLbl = 'Other'
-            elif colorType == 'PSB': # we need to query the redshift catalogue instead of the structural catalogue, as this is the catalogue with d4000 and delta_BIC values
+            elif colorType == 'PSB': 
+                # We need to query the redshift catalogue instead of the structural catalogue, as this is the catalogue with d4000 and delta_BIC values]
+                redshiftData = self.convertData(data, self._redshiftCatalog)
                 # Build gv query string (from McNab et al 2021)
-                gvQuery = 'd4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
+                psbQuery = 'd4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
                 # Build non-gv query string
                 otherQuery = 'd4000 >= 1.45 or delta_BIC >= -10'
                 # Extract desired quantities from data
-                greenValley = data.query(gvQuery)
-                other = data.query(otherQuery)
+                postStarburst = redshiftData.query(psbQuery)
+                other = redshiftData.query(otherQuery)
+                postStarburst = self.convertData(postStarburst, self.catalog)
+                other = self.convertData(other, self.catalog)
                 # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                aData = self.reduceDF(greenValley, additionalCriteria, useStandards)
+                aData = self.reduceDF(postStarburst, additionalCriteria, useStandards)
                 aLbl = 'Post-starburst'
                 bData = self.reduceDF(other, additionalCriteria, useStandards)
                 bLbl = 'Other' 
