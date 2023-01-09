@@ -5,11 +5,8 @@ from astropy import units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import random as rng
 import os
 import warnings
-import scipy.optimize as opt
-import scipy.interpolate as interp
 
 
 
@@ -23,6 +20,7 @@ class GOGREEN:
         """ 
         
         self.catalog = pd.DataFrame()
+        self.sourceCatalog = pd.DataFrame()
         self.standardCriteria = []
         # Private Members
         self._path = dataPath
@@ -33,6 +31,8 @@ class GOGREEN:
         self._redshiftCatalog = pd.DataFrame()
         self._galfitCatalog = pd.DataFrame()
         self._matchedCatalog = pd.DataFrame()
+        self._photSourceCatalog = pd.DataFrame()
+        self._specSourceCatalog = pd.DataFrame()
 
         self.init()
     # END __INIT__
@@ -57,6 +57,19 @@ class GOGREEN:
         redshiftCatPath = self._path + 'DR1/CATS/Redshift_catalogue.fits'
         # Generate a DataFrame of the catalog data
         self._redshiftCatalog = self.generateDF(redshiftCatPath)
+
+        # Build path string to the phot source catalogue
+        photSourceCatPath = self._path + 'STELLPOPS/photometry_stellpops.fits'
+        # Generate a DataFrame of the catalog data
+        self._photSourceCatalog = self.generateDF(photSourceCatPath)
+
+        # Build path string to the spec source catalogue
+        specSourceCatPath = self._path + 'STELLPOPS/redshifts_stellpops.fits'
+        # Generate a DataFrame of the catalog data
+        self._specSourceCatalog = self.generateDF(specSourceCatPath)
+
+        # Merge source catalogs
+        self._photoCatalog = self.merge(self._photSourceCatalog, self._specSourceCatalog)
 
         # Build a DataFrame for each galfit and matched structural parameter cluster (11 total)
         # Then combine them into a single galfit catalog and a single matched catalog
@@ -91,6 +104,8 @@ class GOGREEN:
 
         # Merge photomatched structural catalog with photometric catalog
         self.catalog = self.merge(self._photoCatalog, self._matchedCatalog, 'cPHOTID')
+        # readjust to preserve NaN values after merge
+        self.catalog = self.catalog.replace(100000000000000000000, np.nan)
     # END INIT
 
     def generateDF(self, filePath:str) -> pd.DataFrame:
@@ -255,18 +270,23 @@ class GOGREEN:
         """
         
         # Generate the data used to plot the line
-        A = pow(10, 0.7)
-        alpha = 0.22
+        Asf = pow(10, 0.7)
+        Apassive = pow(10, 0.22)
+        alphaSF = 0.22
+        alphaPassive = 0.76
         xVals = np.array([9.5, 11.5])
         MstellarRange = pow(10, xVals)
-        yVals = np.log10(np.array([A * pow((i / (5 * np.float_power(10, 10))), alpha) for i in MstellarRange]))
+        yValsPassive = np.log10(np.array([Apassive * pow((i / (5 * np.float_power(10, 10))), alphaPassive) for i in MstellarRange]))
+        yValsSF = np.log10(np.array([Asf * pow((i / (5 * np.float_power(10, 10))), alphaSF) for i in MstellarRange]))
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None:
-                axes[row][col].plot(xVals, yVals, linestyle='dashed', color='black')
+                axes[row][col].plot(xVals, yValsPassive, linestyle='dashed', color='red')
+                axes[row][col].plot(xVals, yValsSF, linestyle='dashed', color='blue')
                 return
         # Else plot normally
-        plt.plot(xVals, yVals, linestyle='dashed', color='black')
+        plt.plot(xVals, yValsPassive, linestyle='dashed', color='red')
+        plt.plot(xVals, yValsSF, linestyle='dashed', color='blue')
     #END PLOTVANDERWELLINES
 
     def reConvert(self, data:pd.DataFrame) -> tuple[list, list]:
@@ -952,17 +972,13 @@ class GOGREEN:
                 bData = self.reduceDF(other, additionalCriteria, useStandards)
                 bLbl = 'Other'
             elif colorType == 'PSB': 
-                # We need to query the redshift catalogue instead of the structural catalogue, as this is the catalogue with d4000 and delta_BIC values]
-                redshiftData = self.convertData(data, self._redshiftCatalog)
-                # Build gv query string (from McNab et al 2021)
-                psbQuery = 'd4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
+                # Build psb query string (from McNab et al 2021)
+                psbQuery = 'D4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
                 # Build non-gv query string
-                otherQuery = 'd4000 >= 1.45 or delta_BIC >= -10'
+                otherQuery = 'D4000 >= 1.45 or delta_BIC >= -10'
                 # Extract desired quantities from data
-                postStarburst = redshiftData.query(psbQuery)
-                other = redshiftData.query(otherQuery)
-                postStarburst = self.convertData(postStarburst, self.catalog)
-                other = self.convertData(other, self.catalog)
+                postStarburst = data.query(psbQuery)
+                other = data.query(otherQuery)
                 # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
                 aData = self.reduceDF(postStarburst, additionalCriteria, useStandards)
                 aLbl = 'Post-starburst'
