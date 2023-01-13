@@ -47,12 +47,12 @@ class GOGREEN:
         self._clustersCatalog = self.generateDF(clusterCatPath)
         # Remove whitespaces included with some cluster names
         self._clustersCatalog['cluster'] = self._clustersCatalog['cluster'].str.strip()
-
+        """
         # Build path string to the photometric catalog
         photoCatPath = self._path + 'DR1/CATS/Photo.fits'
         # Generate a DataFrame of the catalog data
         self._photoCatalog = self.generateDF(photoCatPath)
-
+        """
         # Build path string to the redshift catalog
         redshiftCatPath = self._path + 'DR1/CATS/Redshift_catalogue.fits'
         # Generate a DataFrame of the catalog data
@@ -69,7 +69,11 @@ class GOGREEN:
         self._specSourceCatalog = self.generateDF(specSourceCatPath)
 
         # Merge source catalogs
-        self._photoCatalog = self.merge(self._photSourceCatalog, self._specSourceCatalog)
+        merge_col = ['SPECID']
+        # This only ouputs columns with names different than those in the redshift table.  
+        # Make sure that SPECID is added back in as we will match on that field
+        cols_to_use = self._specSourceCatalog.columns.difference(self._photSourceCatalog.columns).tolist() + merge_col
+        self._photoCatalog = self.merge(self._photSourceCatalog, self._specSourceCatalog[cols_to_use], merge_col)
 
         # Build a DataFrame for each galfit and matched structural parameter cluster (11 total)
         # Then combine them into a single galfit catalog and a single matched catalog
@@ -947,9 +951,9 @@ class GOGREEN:
                 bLbl = 'Star Forming'
             elif colorType == 'GV':
                 # Build gv query string (from McNab et al 2021)
-                gvQuery = '(2 * VMINJ + 1.1 <= -2.5 * NUVMINV and (-2.5 * NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
+                gvQuery = '(2 * VMINJ + 1.1 <= -2.5 * NUVMINV) and (-2.5 * NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
                 # Build non-gv query string
-                otherQuery = '(2 * VMINJ + 1.1 > -2.5 * NUVMINV or (-2.5 * NUVMINV > 2 * VMINJ + 1.6)'
+                otherQuery = '(2 * VMINJ + 1.1 > -2.5 * NUVMINV) or (-2.5 * NUVMINV > 2 * VMINJ + 1.6)'
                 # Extract desired quantities from data
                 greenValley = data.query(gvQuery)
                 other = data.query(otherQuery)
