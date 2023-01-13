@@ -947,9 +947,9 @@ class GOGREEN:
                 bLbl = 'Star Forming'
             elif colorType == 'GV':
                 # Build gv query string (from McNab et al 2021)
-                gvQuery = '(2 * VMINJ + 1.1 <= -2.5 * np.log10(NUV/V)) and (-2.5 * np.log10(NUV/V) <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
+                gvQuery = '(2 * VMINJ + 1.1 <= -2.5 * NUVMINV and (-2.5 * NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
                 # Build non-gv query string
-                otherQuery = '(2 * VMINJ + 1.1 > -2.5 * np.log10(NUV/V)) or (-2.5 * np.log10(NUV/V) > 2 * VMINJ + 1.6)'
+                otherQuery = '(2 * VMINJ + 1.1 > -2.5 * NUVMINV or (-2.5 * NUVMINV > 2 * VMINJ + 1.6)'
                 # Extract desired quantities from data
                 greenValley = data.query(gvQuery)
                 other = data.query(otherQuery)
