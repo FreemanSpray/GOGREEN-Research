@@ -1011,14 +1011,14 @@ class GOGREEN:
                 bLbl = None
             # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
             if xQuantityName == 're':
-                aXVals, _ = self.reConvert(aData)
-                bXVals, _ = self.reConvert(bData)
+                aXVals, aXsigmas = self.reConvert(aData)
+                bXVals, bXsigmas = self.reConvert(bData)
             else:
                 aXVals = aData[xQuantityName].values
                 bXVals = bData[xQuantityName].values
             if yQuantityName == 're':
-                aYVals, _ = self.reConvert(aData)
-                bYVals, _ = self.reConvert(bData)
+                aYVals, aYsigmas = self.reConvert(aData)
+                bYVals, bYsigmas = self.reConvert(bData)
             else:
                 aYVals = aData[yQuantityName].values
                 bYVals = bData[yQuantityName].values
@@ -1033,7 +1033,7 @@ class GOGREEN:
             if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
                 self.plotPassiveLines(axes, row, col)
             # generate best fit line
-            if fitLine == True:
+            if fitLine:
                 # Generate two if plotting quiescent v star-forming
                 if colorType == 'passive':
                     self.MSRfit(aData, useLog, axes, row, col, color=color1, bootstrap=bootstrap)
@@ -1042,6 +1042,29 @@ class GOGREEN:
                     self.MSRfit(data, useLog, axes, row, col, bootstrap=bootstrap)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
+            if plotErrBars:
+                for i in range(0, len(aXVals)):
+                    mass = aXVals[i]
+                    size = aYVals[i]
+                    sigma = aYsigmas[i]
+                    upperSigma = np.log10(size + sigma) - np.log10(size)
+                    lowerSigma = np.log10(size) - np.log10(size - sigma)
+                    if np.isnan(upperSigma) or np.isnan(lowerSigma):
+                        plt.scatter(mass, size, alpha=0.5, color='black')
+                    else:
+                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='red')
+                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='red')
+                for i in range(0, len(bXVals)):
+                    mass = bXVals[i]
+                    size = bYVals[i]
+                    sigma = bYsigmas[i]
+                    upperSigma = np.log10(size + sigma) - np.log10(size)
+                    lowerSigma = np.log10(size) - np.log10(size - sigma)
+                    if np.isnan(upperSigma) or np.isnan(lowerSigma):
+                        plt.scatter(mass, size, alpha=0.5, color='black')
+                    else:
+                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='blue')
+                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
             # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
