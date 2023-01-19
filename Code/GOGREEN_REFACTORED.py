@@ -968,9 +968,9 @@ class GOGREEN:
                 bLbl = 'Other'
             elif colorType == 'BQ':
                 # Build bq query string (from McNab et al 2021)
-                bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) or ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 
+                bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 
                 # Build non-bq query string
-                otherQuery = '((VMINJ + 0.45 > UMINV) or (UMINV > VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 > UMINV) or (UMINV > -1.25 * VMINJ + 2.7))'
+                otherQuery = '((VMINJ + 0.45 > UMINV) or (UMINV > VMINJ + 1.35)) or ((-1.25 * VMINJ + 2.025 > UMINV) or (UMINV > -1.25 * VMINJ + 2.7))'
                 # Extract desired quantities from data
                 blueQuiescent = data.query(bqQuery)
                 other = data.query(otherQuery)
@@ -983,7 +983,7 @@ class GOGREEN:
                 # Build psb query string (from McNab et al 2021)
                 psbQuery = 'D4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
                 # Build non-gv query string
-                otherQuery = 'D4000 >= 1.45 or delta_BIC >= -10'
+                otherQuery = 'D4000 >= 1.45 or delta_BIC >= -10' #NOTE: We are excluding data points that have nans for one or both of these fields. May want to change this.
                 # Extract desired quantities from data
                 postStarburst = data.query(psbQuery)
                 other = data.query(otherQuery)
