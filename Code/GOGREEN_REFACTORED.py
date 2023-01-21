@@ -59,12 +59,12 @@ class GOGREEN:
         self._redshiftCatalog = self.generateDF(redshiftCatPath)
 
         # Build path string to the phot source catalogue
-        photSourceCatPath = self._path + 'STELLPOPS/photometry_stellpops.fits'
+        photSourceCatPath = self._path + 'STELLPOPS_V2/photometry_stellpops.fits'
         # Generate a DataFrame of the catalog data
         self._photSourceCatalog = self.generateDF(photSourceCatPath)
 
         # Build path string to the spec source catalogue
-        specSourceCatPath = self._path + 'STELLPOPS/redshifts_stellpops.fits'
+        specSourceCatPath = self._path + 'STELLPOPS_V2/redshifts_stellpops.fits'
         # Generate a DataFrame of the catalog data
         self._specSourceCatalog = self.generateDF(specSourceCatPath)
 
@@ -955,9 +955,9 @@ class GOGREEN:
                 bLbl = 'Star Forming'
             elif colorType == 'GV':
                 # Build gv query string (from McNab et al 2021)
-                gvQuery = '(2 * VMINJ + 1.1 <= -2.5 * NUVMINV) and (-2.5 * NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
+                gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
                 # Build non-gv query string
-                otherQuery = '(2 * VMINJ + 1.1 > -2.5 * NUVMINV) or (-2.5 * NUVMINV > 2 * VMINJ + 1.6)'
+                otherQuery = '(2 * VMINJ + 1.1 > NUVMINV) or (NUVMINV > 2 * VMINJ + 1.6)'
                 # Extract desired quantities from data
                 greenValley = data.query(gvQuery)
                 other = data.query(otherQuery)
