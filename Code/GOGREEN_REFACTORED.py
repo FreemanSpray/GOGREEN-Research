@@ -485,7 +485,7 @@ class GOGREEN:
         elif lineColor == 'green':
             color = [0, 0.5, 0] # darker green
         elif lineColor == 'orange':
-            color = [1, 0.5, 0] # lighter orange
+            color = [1, 0.8, 0.8] # pinkish
         # star-forming and default case
         else:
             color = [0, 0, 0.5] # darker blue
@@ -1009,8 +1009,8 @@ class GOGREEN:
             if fitLine:
                 # Generate two if plotting two distinct categories
                 if colorType != None:
-                    self.MSRfit(aData, useLog, axes, row, col, color=color1, bootstrap=bootstrap)
-                    self.MSRfit(bData, useLog, axes, row, col, color=color2, bootstrap=bootstrap)
+                    self.MSRfit(aData, useLog, axes, row, col, typeRestrict=aLbl, color=color1, bootstrap=bootstrap)
+                    self.MSRfit(bData, useLog, axes, row, col, color=color2, typeRestrict=bLbl, bootstrap=bootstrap)
                 else:
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
             # Generate the plot
@@ -1112,11 +1112,11 @@ class GOGREEN:
         # If not, generate random colors
         else:
             if colorType == 'passive':
-                color1 = [1, 0, 0]
-                color2 = [0, 0, 1]
+                color1 = "red"
+                color2 = "blue"
             else:
-                color1 = [0, 1, 0.5]
-                color2 = [1, 0.5, 0]
+                color1 = "green"
+                color2 = "orange"
         # Plot only the cluster specified
         if plotType == 1:
             if clusterName == None:
