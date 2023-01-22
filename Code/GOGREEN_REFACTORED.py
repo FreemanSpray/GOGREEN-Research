@@ -495,7 +495,7 @@ class GOGREEN:
         plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
-    def getRatio(self, x:float=None, y:float=None, bootstrap:bool=True, limitRange:bool=True) -> list:
+    def getRatio(self, x:float=None, y:float=None, bootstrap:bool=True, limitRange:bool=True, useTransition:bool=False) -> list:
         """
         Calculates the ratio of member over non-member galaxies (for both passive and star-forming). Also has an option to plot the trendlines for these 4 categories
 
@@ -538,6 +538,33 @@ class GOGREEN:
         mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming', color='blue', bootstrap=bootstrap)
         mNonMemberQ, bNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent', color='orange', bootstrap=bootstrap)
         mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming', color='green', bootstrap=bootstrap)
+        # Transition galaxy option
+        if useTransition:
+            # Build query strings
+            gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)'
+            bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))'
+            psbQuery = 'D4000 < 1.45 and delta_BIC < -10'
+            # Extracted desired quantities from data
+            gvMembers = members.query(gvQuery)
+            gvNonMembers = nonMembers.query(gvQuery)
+            bqMembers = members.query(bqQuery)
+            bqNonMembers = nonMembers.query(bqQuery)
+            psbMembers = members.query(psbQuery)
+            psbNonMembers = nonMembers.query(psbQuery)
+            # Reduce again
+            gvMembers = self.reduceDF(passiveMembers, None, True)
+            gvNonMembers = self.reduceDF(passiveMembers, None, True)
+            bqMembers = self.reduceDF(passiveMembers, None, True)
+            bqNonMembers = self.reduceDF(passiveMembers, None, True)
+            psbMembers = self.reduceDF(passiveMembers, None, True)
+            psbNonMembers = self.reduceDF(passiveMembers, None, True)
+            # Plot trends (6 additional lines)
+            _, _ = self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV', color='purple', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV', color='pink', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=bqMembers, useLog=[True, True], typeRestrict='BQ', color='black', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=bqNonMembers, useLog=[True, True], typeRestrict='BQ', color='gray', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB', color='brown', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB', color='yellow', bootstrap=bootstrap)
         if limitRange:
             plt.xlim(9.5, 11.5)
             plt.ylim(-0.75, 1.25)
