@@ -512,6 +512,8 @@ class GOGREEN:
                             Default: None
         :return: size 2 list of the two ratios of member over non-member galaxies (first element is for quiescent, second is for star-forming)
         """
+        # Adjust plot size
+        plt.figure(figsize=(10,10))
         # Initialize dataframes            
         members = pd.DataFrame()
         nonMembers = pd.DataFrame()
@@ -534,10 +536,10 @@ class GOGREEN:
         starFormingMembers = self.reduceDF(starFormingMembers, None, True)
         starFormingNonMembers = self.reduceDF(starFormingNonMembers, None, True)
         # Plot quiescent and sf trends for members and nonmembers (4 lines total)
-        mMemberQ, bMemberQ = self.MSRfit(data=passiveMembers, useLog=[True, True], typeRestrict='Quiescent', color='red', bootstrap=bootstrap)
-        mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming', color='blue', bootstrap=bootstrap)
-        mNonMemberQ, bNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent', color='orange', bootstrap=bootstrap)
-        mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming', color='green', bootstrap=bootstrap)
+        mMemberQ, bMemberQ = self.MSRfit(data=passiveMembers, useLog=[True, True], typeRestrict='Quiescent cluster', color='red', bootstrap=bootstrap)
+        mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming cluster', color='blue', bootstrap=bootstrap)
+        mNonMemberQ, bNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent field', color='orange', bootstrap=bootstrap)
+        mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
         # Transition galaxy option
         if useTransition:
             # Build query strings
@@ -552,19 +554,19 @@ class GOGREEN:
             psbMembers = members.query(psbQuery)
             psbNonMembers = nonMembers.query(psbQuery)
             # Reduce again
-            gvMembers = self.reduceDF(passiveMembers, None, True)
-            gvNonMembers = self.reduceDF(passiveMembers, None, True)
-            bqMembers = self.reduceDF(passiveMembers, None, True)
-            bqNonMembers = self.reduceDF(passiveMembers, None, True)
-            psbMembers = self.reduceDF(passiveMembers, None, True)
-            psbNonMembers = self.reduceDF(passiveMembers, None, True)
+            gvMembers = self.reduceDF(gvMembers, None, True)
+            gvNonMembers = self.reduceDF(gvNonMembers, None, True)
+            bqMembers = self.reduceDF(bqMembers, None, True)
+            bqNonMembers = self.reduceDF(bqNonMembers, None, True)
+            psbMembers = self.reduceDF(psbMembers, None, True)
+            psbNonMembers = self.reduceDF(psbNonMembers, None, True)
             # Plot trends (6 additional lines)
-            _, _ = self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV', color='purple', bootstrap=bootstrap)
-            _, _ = self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV', color='pink', bootstrap=bootstrap)
-            _, _ = self.MSRfit(data=bqMembers, useLog=[True, True], typeRestrict='BQ', color='black', bootstrap=bootstrap)
-            _, _ = self.MSRfit(data=bqNonMembers, useLog=[True, True], typeRestrict='BQ', color='gray', bootstrap=bootstrap)
-            _, _ = self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB', color='brown', bootstrap=bootstrap)
-            _, _ = self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB', color='yellow', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV cluster', color='purple', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV field', color='pink', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=bqMembers, useLog=[True, True], typeRestrict='BQ cluster', color='black', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=bqNonMembers, useLog=[True, True], typeRestrict='BQ field', color='gray', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB cluster', color='brown', bootstrap=bootstrap)
+            #_, _ = self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB field', color='yellow', bootstrap=bootstrap)
         if limitRange:
             plt.xlim(9.5, 11.5)
             plt.ylim(-0.75, 1.25)
