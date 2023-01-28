@@ -978,72 +978,35 @@ class GOGREEN:
                 pass
             elif colorType == 'membership':
                 # Extract desired quantities from data
-                aData = data[~data['zspec'].isna()]
+                aData = data.query('spectroscopic == 1 and goodData == 1')
                 aLbl = 'Spectroscopic z'
                 # Assume photZ are those that do not have a specZ
-                bData = data[~data['cPHOTID'].isin(aData['cPHOTID'])]
+                bData = data.query('photometric == 1 and goodData == 1')
                 bLbl = 'Photometric z'
             elif colorType == 'passive':
-                # Build passive query string (from van der Burg et al. 2020)
-                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                # Build active query string
-                starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                # Extract desired quantities from data
-                passive = data.query(passiveQuery)
-                starForming = data.query(starFormingQuery)
-                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                aData = self.reduceDF(passive, additionalCriteria, useStandards)
+                aData = data.query('passive == 1 and goodData == 1')
                 aLbl = 'Quiescent'
-                bData = self.reduceDF(starForming, additionalCriteria, useStandards)
+                bData = data.query('starForming == 1 and goodData == 1')
                 bLbl = 'Star Forming'
             elif colorType == 'GV':
-                # Build gv query string (from McNab et al 2021)
-                gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6
-                # Build non-gv query string
-                otherQuery = '(2 * VMINJ + 1.1 > NUVMINV) or (NUVMINV > 2 * VMINJ + 1.6)'
-                # Extract desired quantities from data
-                greenValley = data.query(gvQuery)
-                other = data.query(otherQuery)
-                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                aData = self.reduceDF(greenValley, additionalCriteria, useStandards)
+                aData = data.query('greenValley == 1 and goodData == 1')
                 aLbl = 'Green Valley'
-                bData = self.reduceDF(other, additionalCriteria, useStandards)
+                bData = data.query('greenValley == 0 and goodData == 1')
                 bLbl = 'Other'
             elif colorType == 'BQ':
-                # Build bq query string (from McNab et al 2021)
-                bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 
-                # Build non-bq query string
-                otherQuery = '((VMINJ + 0.45 > UMINV) or (UMINV > VMINJ + 1.35)) or ((-1.25 * VMINJ + 2.025 > UMINV) or (UMINV > -1.25 * VMINJ + 2.7))'
-                # Extract desired quantities from data
-                blueQuiescent = data.query(bqQuery)
-                other = data.query(otherQuery)
-                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                aData = self.reduceDF(blueQuiescent, additionalCriteria, useStandards)
+                aData = data.query('blueQuiescent == 1 and goodData == 1')
                 aLbl = 'Blue Quiescent'
-                bData = self.reduceDF(other, additionalCriteria, useStandards)
+                bData = data.query('blueQuiescent == 0 and goodData == 1')
                 bLbl = 'Other'
             elif colorType == 'PSB': 
-                # Build psb query string (from McNab et al 2021)
-                psbQuery = 'D4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) 
-                # Build non-gv query string
-                otherQuery = 'D4000 >= 1.45 or delta_BIC >= -10' #NOTE: We are excluding data points that have nans for one or both of these fields. May want to change this.
-                # Extract desired quantities from data
-                postStarburst = data.query(psbQuery)
-                other = data.query(otherQuery)
-                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                aData = self.reduceDF(postStarburst, additionalCriteria, useStandards)
+                aData = data.query('postStarBurst == 1 and goodData == 1')
                 aLbl = 'Post-starburst'
-                bData = self.reduceDF(other, additionalCriteria, useStandards)
+                bData = data.query('postStarBurst == 0 and goodData == 1')
                 bLbl = 'Other' 
             elif colorType == 'sersic':
-                # Build elliptical query string
-                elliptical = data.query('2.5 < n < 6')
-                # Build spiral query string
-                spiral = data.query('n <= 2.5')
-                # Unsure if need to reduce again. Doing it to be on the safe side.
-                aData = self.reduceDF(elliptical, additionalCriteria, useStandards)
+                aData = data.query('elliptical == 1 and goodData == 1')
                 aLbl = 'Elliptical'
-                bData = self.reduceDF(spiral, additionalCriteria, useStandards)
+                bData = data.query('spiral == 1 and goodData == 1')
                 bLbl = 'Spiral'
             else:
                 print(colorType, ' is not a valid coloring scheme!')
