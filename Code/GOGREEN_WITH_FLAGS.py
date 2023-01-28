@@ -1016,19 +1016,10 @@ class GOGREEN:
             else:
                 print(colorType, ' is not a valid coloring scheme!')
                 return
-            # Check if either axis is measuring effective radius for the purpose of unit conversion, if not assign values directly
-            if xQuantityName == 're':
-                aXVals, aXsigmas = self.reConvert(aData)
-                bXVals, bXsigmas = self.reConvert(bData)
-            else:
-                aXVals = aData[xQuantityName].values
-                bXVals = bData[xQuantityName].values
-            if yQuantityName == 're':
-                aYVals, aYsigmas = self.reConvert(aData)
-                bYVals, bYsigmas = self.reConvert(bData)
-            else:
-                aYVals = aData[yQuantityName].values
-                bYVals = bData[yQuantityName].values
+            aXVals = aData[xQuantityName].values
+            bXVals = bData[xQuantityName].values
+            aYVals = aData[yQuantityName].values
+            bYVals = bData[yQuantityName].values
             # Check if either axis needs to be put in log scale
             if useLog[0] == True:
                 aXVals = np.log10(aXVals)
@@ -1050,6 +1041,13 @@ class GOGREEN:
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if plotErrBars:
+                # Extract error values
+                if yQuantityName == 're':
+                    aYsigmas = aData['re_err'].values
+                    bYsigmas = bData['re_err'].values
+                elif yQuantityName == 're_converted':
+                    aYsigmas = aData['re_err_converted'].values
+                    bYsigmas = bData['re_err_converted'].values
                 for i in range(0, len(aXVals)):
                     mass = aXVals[i]
                     size = aYVals[i]
