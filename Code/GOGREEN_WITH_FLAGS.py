@@ -110,7 +110,39 @@ class GOGREEN:
         self.catalog = self.merge(self._photoCatalog, self._matchedCatalog, 'cPHOTID')
         # readjust to preserve NaN values after merge
         self.catalog = self.catalog.replace(100000000000000000000, np.nan)
+        # Generate flags for use in plotting
+        self.generateFlags()
     # END INIT
+
+    def generateFlags(self):
+        # Initialize queries
+        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6 (from McNab et al 2021)
+        bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 (from McNab et al 2021)
+        psbQuery = 'D4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) (from McNab et al 2021)
+        ellipticalQuery = '2.5 < n < 6'
+        spiralQuery = 'n <= 2.5'
+        # Initialize flags
+        self.catalog['goodData'] = 1
+        reduced = self.catalog[~self.catalog['zspec'].isna()]
+        self.catalog['spectroscopic'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        self.catalog['photometric'] = ~self.catalog['spectroscopic'] # this is in line with how phot was being calculated previously. We may want to try a solution not dependent on the spec calculation
+        reduced = self.catalog.query(passiveQuery)
+        self.catalog['passive'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(starFormingQuery)
+        self.catalog['starForming'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(gvQuery)
+        self.catalog['elliptical'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(bqQuery)
+        self.catalog['goodData'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(psbQuery)
+        self.catalog['spiral'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(ellipticalQuery)
+        self.catalog['greenValley'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(spiralQuery)
+        self.catalog['goodData'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+    # END GENERATEFLAGS
 
     def generateDF(self, filePath:str) -> pd.DataFrame:
         """
@@ -211,12 +243,17 @@ class GOGREEN:
         :return:                   Pandas DataFrame containing the galaxies whose values meet the criteria within param:additionalCriteria
                                    and the standard criteria (if param:useStandards is True)
         """
+        #print(frame)
         if (additionalCriteria != None):
             for criteria in additionalCriteria:
-                frame = frame.query(criteria)
+                reduced = frame.query(criteria)
+                frame['goodData'] = frame['goodData'] & (frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
         if useStandards:
             for criteria in self.standardCriteria:
-                frame = frame.query(criteria)
+                reduced = frame.query(criteria)
+                #print(frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
+                frame['goodData'] = frame['goodData'] & (frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int)) # https://www.geeksforgeeks.org/python-pandas-series-astype-to-convert-data-type-of-series/
+        #print(frame[frame.goodData == 1])
         return frame
     # END REDUCEDF
         
@@ -1166,7 +1203,7 @@ class GOGREEN:
             else:
                 print(useMembers, " is not a valid membership requirement!")
                 return
-            # Apply other specified reducing constraints
+            # Create 'goodData' flag for future checks
             data = self.reduceDF(data, additionalCriteria, useStandards)
             # Plot data
             xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars)
@@ -1200,7 +1237,7 @@ class GOGREEN:
                     else:
                         print(useMembers, " is not a valid membership requirement!")
                         return
-                    # Apply other specified reducing constraints
+                    # Create 'goodData' flag for future checks
                     data = self.reduceDF(data, additionalCriteria, useStandards)
                     # Plot data
                     x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars)
@@ -1244,7 +1281,7 @@ class GOGREEN:
                 else:
                     print(useMembers, " is not a valid membership requirement!")
                     return
-            # Apply other specified reducing constraints
+            # Create 'goodData' flag for future checks
             data = self.reduceDF(data, additionalCriteria, useStandards)
             xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars)
         else:
