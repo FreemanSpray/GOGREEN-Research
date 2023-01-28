@@ -112,6 +112,8 @@ class GOGREEN:
         self.catalog = self.catalog.replace(100000000000000000000, np.nan)
         # Generate flags for use in plotting
         self.generateFlags()
+        # Generate unit conversion fields for use in effective radius plots.
+        self.reConvert()
     # END INIT
 
     def generateFlags(self):
@@ -330,7 +332,7 @@ class GOGREEN:
         plt.plot(xVals, yValsSF, linestyle='dashed', color='blue')
     #END PLOTVANDERWELLINES
 
-    def reConvert(self, data:pd.DataFrame) -> tuple[list, list]:
+    def reConvert(self):
         """
         reConvert convert effective radius values from units of arcsec to kpc.
 
@@ -338,20 +340,23 @@ class GOGREEN:
         :return   :    returns the list of converted effective radius values
 
         """
-        if data['re'].values.shape == (0,):
-            # If there are no values, return empty array so attempting to convert does not cause a crash
-            return [], []
-        sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-        sigmas = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
-        for i in range(0, len(sizes)):
-            if np.isnan(sizes[i]): #checking where conversion failed due to lack of zspec value
-                sizes[i] = data['re'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-        for i in range(0, len(sigmas)):
-            if np.isnan(sigmas[i]): #checking where conversion failed due to lack of zspec value
-               sigmas[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-        sizes = (sizes / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        sigmas = (sigmas / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        return sizes, sigmas
+        sizes =  self.catalog['re'].values
+        errs = self.catalog['re_err'].values
+        length = len(sizes)
+        # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
+        sizes_converted = sizes * (cosmo.kpc_proper_per_arcmin(self.catalog['zspec'].values)/60)
+        errs_converted = errs * (cosmo.kpc_proper_per_arcmin(self.catalog['zspec'].values)/60)
+        # Try zphot values where conversion failed due to lack of zspec value
+        for i in range(0, length):
+            if np.isnan(sizes_converted[i]):
+                sizes_converted[i] = sizes[i] * (cosmo.kpc_proper_per_arcmin(self.catalog['zphot'].values[i])/60)
+            if np.isnan(errs_converted[i]):
+               errs_converted[i] = errs[i] * (cosmo.kpc_proper_per_arcmin(self.catalog['zphot'].values[i])/60)
+        # Remove units
+        sizes_converted = (sizes_converted / u.kpc) * u.arcmin
+        errs_converted = (errs_converted / u.kpc) * u.arcmin
+        self.catalog['re_converted'] = sizes_converted
+        self.catalog['re_errs_converted'] = errs_converted
     #END RECONVERT
 
     def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, typeRestrict:str=None, color:str=None, bootstrap:bool=True):
