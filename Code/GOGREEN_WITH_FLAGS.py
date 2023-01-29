@@ -129,7 +129,8 @@ class GOGREEN:
         self.catalog['goodData'] = 1
         reduced = self.catalog[~self.catalog['zspec'].isna()]
         self.catalog['spectroscopic'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-        self.catalog['photometric'] = ~self.catalog['spectroscopic'] # this is in line with how phot was being calculated previously. We may want to try a solution not dependent on the spec calculation
+        reduced = self.catalog[self.catalog['zspec'].isna()]
+        self.catalog['photometric'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int) # this is in line with how phot was being calculated previously. We may want to try a solution not dependent on the spec calculation
         reduced = self.catalog.query(passiveQuery)
         self.catalog['passive'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
         reduced = self.catalog.query(starFormingQuery)
@@ -356,7 +357,7 @@ class GOGREEN:
         sizes_converted = (sizes_converted / u.kpc) * u.arcmin
         errs_converted = (errs_converted / u.kpc) * u.arcmin
         self.catalog['re_converted'] = sizes_converted
-        self.catalog['re_errs_converted'] = errs_converted
+        self.catalog['re_err_converted'] = errs_converted
     #END RECONVERT
 
     def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, typeRestrict:str=None, color:str=None, bootstrap:bool=True):
@@ -392,48 +393,46 @@ class GOGREEN:
             lbl = "stellar mass-size relation trend"
         else:
             lbl = typeRestrict + " stellar mass-size relation trend"
-        # Convert all effective radii and associated errors from units of arcsec to kpc using their spectroscopic redshifts
-        size, sigmas = self.reConvert(data)
-        # Extract mass values
+        # Extract values frmo data
+        size = data['re_converted'].values
         mass = data['Mstellar'].values
+        errs = data['re_err_converted'].values
         # Calculate coefficients (slope and y-intercept)
-        xFitData = mass
-        yFitData = size
         if useLog[0] == True:
-            xFitData = np.log10(xFitData)
+            mass = np.log10(mass)
         if useLog[1] == True:
-            yFitData = np.log10(yFitData)
-            upperSigmas = np.log10(size + sigmas) - np.log10(size)
-            lowerSigmas = np.log10(size) - np.log10(size - sigmas)
-            sigmas = (upperSigmas + lowerSigmas)/2
+            size = np.log10(size)
+            upperErrs = np.log10(size + errs) - np.log10(size)
+            lowerErrs = np.log10(size) - np.log10(size - errs)
+            errs = (upperErrs + lowerErrs)/2
         # Transform error values into weights
-        weights = 1/np.array(sigmas)
+        weights = 1/np.array(errs)
         for i in range(0, len(weights)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
             if np.isinf(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
-        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
+        s = np.polynomial.polynomial.Polynomial.fit(x=mass, y=size, deg=1, w=weights)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
                 if bootstrap:
                     # Bootstrapping calculation
-                    self.bootstrap(xFitData, yFitData, weights, axes, row, col, lineColor=color)
+                    self.bootstrap(mass, size, weights, axes, row, col, lineColor=color)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
-                    axes[row][col].plot(xFitData, s(xFitData), color='white', linewidth=4)
+                    axes[row][col].plot(mass, s(mass), color='white', linewidth=4)
                 # Plot the best fit line
-                axes[row][col].plot(xFitData, s(xFitData), color=color, label=lbl)
+                axes[row][col].plot(mass, s(mass), color=color, label=lbl)
                 return
         if bootstrap:
             # Bootstrapping calculation
-            self.bootstrap(xFitData, yFitData, weights, axes, row, col, lineColor=color)
+            self.bootstrap(mass, size, weights, axes, row, col, lineColor=color)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
-            plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
+            plt.plot(mass, s(mass), color='white', linewidth=4)
         # Plot the best fit line
-        plt.plot(xFitData, s(xFitData), color=color, label=lbl)
+        plt.plot(mass, s(mass), color=color, label=lbl)
         coefs = s.convert().coef
         b = coefs[0]
         m = coefs[1]
@@ -865,7 +864,7 @@ class GOGREEN:
                             cluster = "SpARCS1616"
                         else:
                             cluster = None
-                        xCountMSR, yCountMSR = self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xCountMSR, yCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                         xCountUVJ, yCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
                         # End test early (and with specific error) if major discrepency is found
                         if xCountMSR != yCountMSR or xCountUVJ != yCountUVJ:
@@ -982,10 +981,8 @@ class GOGREEN:
                 # Don't need to do anything for this case. Included so program proceeds as normal
                 pass
             elif colorType == 'membership':
-                # Extract desired quantities from data
                 aData = data.query('spectroscopic == 1 and goodData == 1')
                 aLbl = 'Spectroscopic z'
-                # Assume photZ are those that do not have a specZ
                 bData = data.query('photometric == 1 and goodData == 1')
                 bLbl = 'Photometric z'
             elif colorType == 'passive':
@@ -1137,6 +1134,8 @@ class GOGREEN:
         """
         # Initialize plot
         plt.figure(figsize=(8,6))
+        # Create 'goodData' flag for future checks
+        self.reduceDF(data, additionalCriteria, useStandards)
         # Check if plot colors were provided by the user
         if colors != None:
             color1 = colors[0]
@@ -1169,8 +1168,6 @@ class GOGREEN:
             else:
                 print(useMembers, " is not a valid membership requirement!")
                 return
-            # Create 'goodData' flag for future checks
-            data = self.reduceDF(data, additionalCriteria, useStandards)
             # Plot data
             xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars)
         # Plot all clusters individually in a subplot
@@ -1203,8 +1200,6 @@ class GOGREEN:
                     else:
                         print(useMembers, " is not a valid membership requirement!")
                         return
-                    # Create 'goodData' flag for future checks
-                    data = self.reduceDF(data, additionalCriteria, useStandards)
                     # Plot data
                     x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars)
                     # Update data count totals
@@ -1247,8 +1242,6 @@ class GOGREEN:
                 else:
                     print(useMembers, " is not a valid membership requirement!")
                     return
-            # Create 'goodData' flag for future checks
-            data = self.reduceDF(data, additionalCriteria, useStandards)
             xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars)
         else:
             print(plotType, " is not a valid plotting scheme!")
