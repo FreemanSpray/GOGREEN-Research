@@ -136,15 +136,15 @@ class GOGREEN:
         reduced = self.catalog.query(starFormingQuery)
         self.catalog['starForming'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
         reduced = self.catalog.query(gvQuery)
-        self.catalog['elliptical'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-        reduced = self.catalog.query(bqQuery)
-        self.catalog['goodData'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-        reduced = self.catalog.query(psbQuery)
-        self.catalog['spiral'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-        reduced = self.catalog.query(ellipticalQuery)
         self.catalog['greenValley'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(bqQuery)
+        self.catalog['blueQuiescent'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(psbQuery)
+        self.catalog['postStarBurst'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(ellipticalQuery)
+        self.catalog['elliptical'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
         reduced = self.catalog.query(spiralQuery)
-        self.catalog['goodData'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        self.catalog['spiral'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
     # END GENERATEFLAGS
 
     def generateDF(self, filePath:str) -> pd.DataFrame:
@@ -236,7 +236,7 @@ class GOGREEN:
         return nonMemberGalaxies
     # END GETNONMEMBERS
 
-    def reduceDF(self, frame:pd.DataFrame, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
+    def reduceDF(self, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
         """
         reduceDF Reduces the DataFrame param:frame to contain only galaxies that meet the criteria provided in
                  param:additionalCriteria and the standard criteria (if param:useStandards is True)
@@ -249,15 +249,15 @@ class GOGREEN:
         #print(frame)
         if (additionalCriteria != None):
             for criteria in additionalCriteria:
-                reduced = frame.query(criteria)
-                frame['goodData'] = frame['goodData'] & (frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
+                reduced = self.catalog.query(criteria)
+                self.catalog['goodData'] = self.catalog['goodData'] & (self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
         if useStandards:
             for criteria in self.standardCriteria:
-                reduced = frame.query(criteria)
+                reduced = self.catalog.query(criteria)
                 #print(frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
-                frame['goodData'] = frame['goodData'] & (frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int)) # https://www.geeksforgeeks.org/python-pandas-series-astype-to-convert-data-type-of-series/
+                self.catalog['goodData'] = self.catalog['goodData'] & (self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)) # https://www.geeksforgeeks.org/python-pandas-series-astype-to-convert-data-type-of-series/
         #print(frame[frame.goodData == 1])
-        return frame
+        return self.catalog
     # END REDUCEDF
         
     def getClusterGalaxies(self, clusterName:str) -> pd.DataFrame:
@@ -972,8 +972,8 @@ class GOGREEN:
             :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points
             """
             # Arbitrary establishment of variables for non-coloring case
-            aData = data
-            bData = data
+            aData = data.query('goodData == 1')
+            bData = data.query('goodData == 1')
             aLbl = None
             bLbl = None
             # Overwrite variables according to coloring scheme
@@ -1034,6 +1034,7 @@ class GOGREEN:
                     self.MSRfit(aData, useLog, axes, row, col, typeRestrict=aLbl, color=color1, bootstrap=bootstrap)
                     self.MSRfit(bData, useLog, axes, row, col, color=color2, typeRestrict=bLbl, bootstrap=bootstrap)
                 else:
+                    print(aData.shape)
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
@@ -1135,7 +1136,7 @@ class GOGREEN:
         # Initialize plot
         plt.figure(figsize=(8,6))
         # Create 'goodData' flag for future checks
-        self.reduceDF(data, additionalCriteria, useStandards)
+        self.reduceDF(additionalCriteria, useStandards)
         # Check if plot colors were provided by the user
         if colors != None:
             color1 = colors[0]

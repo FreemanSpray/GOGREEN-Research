@@ -1041,6 +1041,7 @@ class GOGREEN:
                     self.MSRfit(aData, useLog, axes, row, col, typeRestrict=aLbl, color=color1, bootstrap=bootstrap)
                     self.MSRfit(bData, useLog, axes, row, col, color=color2, typeRestrict=bLbl, bootstrap=bootstrap)
                 else:
+                    print(aData.shape)
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
