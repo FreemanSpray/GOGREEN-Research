@@ -401,9 +401,9 @@ class GOGREEN:
         if useLog[0] == True:
             mass = np.log10(mass)
         if useLog[1] == True:
-            size = np.log10(size)
             upperErrs = np.log10(size + errs) - np.log10(size)
             lowerErrs = np.log10(size) - np.log10(size - errs)
+            size = np.log10(size)
             errs = (upperErrs + lowerErrs)/2
         # Transform error values into weights
         weights = 1/np.array(errs)
@@ -411,7 +411,7 @@ class GOGREEN:
             if np.isinf(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
-                weights[i] = 0 #setting to 0 because this data point should not be used
+                weights[i] = 0 #setting to 0 because this data point should not be used      
         s = np.polynomial.polynomial.Polynomial.fit(x=mass, y=size, deg=1, w=weights)
         if row != None and col != None:
             # Check for subplots

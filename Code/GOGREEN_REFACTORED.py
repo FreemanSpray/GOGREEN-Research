@@ -371,6 +371,11 @@ class GOGREEN:
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
+        print(xFitData.shape)
+        print(weights.shape)
+        print(weights)
+        print(xFitData)
+        print(yFitData)  
         s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights)
         if row != None and col != None:
             # Check for subplots
