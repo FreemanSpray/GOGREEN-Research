@@ -118,8 +118,10 @@ class GOGREEN:
 
     def generateFlags(self):
         # Initialize queries
-        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)' #(from van der Burg et al. 2020)
-        starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        #passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        passiveQuery = 'NUVMINV > 2 * VMINJ + 1.6' #(𝑁𝑈𝑉 − 𝑉 ) > 2(𝑉 − 𝐽) + 1.6(from McNab et al 2021)
+        #starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        starFormingQuery = 'NUVMINV < 2 * VMINJ + 1.1' #(𝑁𝑈𝑉 − 𝑉 ) < 2(𝑉 − 𝐽) + 1.1 (from McNab et al 2021)
         gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6 (from McNab et al 2021)
         bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 (from McNab et al 2021)
         psbQuery = 'D4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) (from McNab et al 2021)
@@ -332,6 +334,53 @@ class GOGREEN:
         plt.plot(xVals, yValsPassive, linestyle='dashed', color='red')
         plt.plot(xVals, yValsSF, linestyle='dashed', color='blue')
     #END PLOTVANDERWELLINES
+
+    def plotMcNabPlots(self):
+        """
+        plotMcNabPlots plots two plots from McNab et. al. 2021
+
+        :return    :     plots are plotted
+        """
+        # Reduce according to criteria
+        self.reduceDF(None, True)
+        # Initialize dataframes            
+        members = pd.DataFrame()
+        # For each cluster, add members and non-members to respective dataframes
+        for clusterName in self._structClusterNames:
+            members = members.append(self.getMembers(clusterName))
+        # Extract desired quantities from data
+        passiveMembers = members.query('passive == 1 and goodData == 1')
+        starFormingMembers = members.query('starForming == 1 and goodData == 1')
+        greenValleyMembers = members.query('greenValley == 1 and goodData == 1')
+        blueQuiescentMembers = members.query('blueQuiescent == 1 and goodData == 1')
+        postStarBurstMembers = members.query('postStarBurst == 1 and goodData == 1')
+
+        plt.figure()
+        plt.scatter(passiveMembers['VMINJ'], passiveMembers['NUVMINV'], alpha=0.5, color='red')
+        plt.scatter(starFormingMembers['VMINJ'], starFormingMembers['NUVMINV'], alpha=0.5, color='blue')
+        plt.scatter(greenValleyMembers['VMINJ'], greenValleyMembers['NUVMINV'], alpha=0.5, color='green')
+        plt.scatter(blueQuiescentMembers['VMINJ'], blueQuiescentMembers['NUVMINV'], alpha=0.5, color='yellow')
+        plt.scatter(postStarBurstMembers['VMINJ'], postStarBurstMembers['NUVMINV'], alpha=0.5, color='purple')
+        plt.plot([0, 1.75], [2, 5], linestyle='dashed', color='black')
+        plt.plot([0, 1.75], [1.5, 4.5], linestyle='dashed', color='black')
+        plt.xlim(0, 2)
+        plt.ylim(1, 6)
+        plt.legend()
+
+        plt.figure()
+        plt.scatter(passiveMembers['VMINJ'], passiveMembers['UMINV'], alpha=0.5, color='red')
+        plt.scatter(starFormingMembers['VMINJ'], starFormingMembers['UMINV'], alpha=0.5, color='blue')
+        plt.scatter(greenValleyMembers['VMINJ'], greenValleyMembers['UMINV'], alpha=0.5, color='green')
+        plt.scatter(blueQuiescentMembers['VMINJ'], blueQuiescentMembers['UMINV'], alpha=0.5, color='yellow')
+        plt.scatter(postStarBurstMembers['VMINJ'], postStarBurstMembers['UMINV'], alpha=0.5, color='purple')
+        plt.plot([0, 1.75], [2, 5], linestyle='dashed', color='black') # top left
+        plt.plot([0.7, 1], [1.2, 1.65], linestyle='dashed', color='black') # bottom right
+        plt.plot([0.6, 1], [1.45, 1.9], linestyle='dashed', color='black') # top right
+        plt.plot([0.3, 0.7], [1.2, 1.65], linestyle='dashed', color='black') # bottom left
+        plt.xlim(0, 2)
+        plt.ylim(1, 6)
+        plt.legend()
+    #END PLOTMCNABPLOTS
 
     def reConvert(self):
         """
