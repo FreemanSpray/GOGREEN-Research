@@ -555,6 +555,8 @@ class GOGREEN:
         """
         # Adjust plot size
         plt.figure(figsize=(10,10))
+        # Reduce according to criteria
+        self.reduceDF(None, True)
         # Initialize dataframes            
         members = pd.DataFrame()
         nonMembers = pd.DataFrame()
@@ -562,20 +564,11 @@ class GOGREEN:
         for clusterName in self._structClusterNames:
             members = members.append(self.getMembers(clusterName))
             nonMembers = nonMembers.append(self.getNonMembers(clusterName))
-        # Build passive query string (from van der Burg et al. 2020)
-        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-        # Build active query string
-        starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
         # Extract desired quantities from data
-        passiveMembers = members.query(passiveQuery)
-        passiveNonMembers = nonMembers.query(passiveQuery)
-        starFormingMembers = members.query(starFormingQuery)
-        starFormingNonMembers = nonMembers.query(starFormingQuery)
-        # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously.
-        passiveMembers = self.reduceDF(passiveMembers, None, True)
-        passiveNonMembers = self.reduceDF(passiveNonMembers, None, True)
-        starFormingMembers = self.reduceDF(starFormingMembers, None, True)
-        starFormingNonMembers = self.reduceDF(starFormingNonMembers, None, True)
+        passiveMembers = members.query('passive == 1 and goodData == 1')
+        passiveNonMembers = nonMembers.query('passive == 1 and goodData == 1')
+        starFormingMembers = members.query('starForming == 1 and goodData == 1')
+        starFormingNonMembers = nonMembers.query('starForming == 1 and goodData == 1')
         # Plot quiescent and sf trends for members and nonmembers (4 lines total)
         mMemberQ, bMemberQ = self.MSRfit(data=passiveMembers, useLog=[True, True], typeRestrict='Quiescent cluster', color='red', bootstrap=bootstrap)
         mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming cluster', color='blue', bootstrap=bootstrap)
@@ -583,24 +576,13 @@ class GOGREEN:
         mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
         # Transition galaxy option
         if useTransition:
-            # Build query strings
-            gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)'
-            bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))'
-            psbQuery = 'D4000 < 1.45 and delta_BIC < -10'
             # Extracted desired quantities from data
-            gvMembers = members.query(gvQuery)
-            gvNonMembers = nonMembers.query(gvQuery)
-            bqMembers = members.query(bqQuery)
-            bqNonMembers = nonMembers.query(bqQuery)
-            psbMembers = members.query(psbQuery)
-            psbNonMembers = nonMembers.query(psbQuery)
-            # Reduce again
-            gvMembers = self.reduceDF(gvMembers, None, True)
-            gvNonMembers = self.reduceDF(gvNonMembers, None, True)
-            bqMembers = self.reduceDF(bqMembers, None, True)
-            bqNonMembers = self.reduceDF(bqNonMembers, None, True)
-            psbMembers = self.reduceDF(psbMembers, None, True)
-            psbNonMembers = self.reduceDF(psbNonMembers, None, True)
+            gvMembers = members.query('greenValley == 1 and goodData == 1')
+            gvNonMembers = nonMembers.query('greenValley == 1 and goodData == 1')
+            bqMembers = members.query('blueQuiescent == 1 and goodData == 1')
+            bqNonMembers = nonMembers.query('blueQuiescent == 1 and goodData == 1')
+            psbMembers = members.query('postStarBurst == 1 and goodData == 1')
+            psbNonMembers = nonMembers.query('postStarBurst == 1 and goodData == 1')
             # Plot trends (6 additional lines)
             _, _ = self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV cluster', color='purple', bootstrap=bootstrap)
             _, _ = self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV field', color='pink', bootstrap=bootstrap)
@@ -1034,7 +1016,7 @@ class GOGREEN:
                     self.MSRfit(aData, useLog, axes, row, col, typeRestrict=aLbl, color=color1, bootstrap=bootstrap)
                     self.MSRfit(bData, useLog, axes, row, col, color=color2, typeRestrict=bLbl, bootstrap=bootstrap)
                 else:
-                    print(aData.shape)
+                    #print(aData.shape)
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
@@ -1071,7 +1053,7 @@ class GOGREEN:
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
             # Plot van der Wel et al. 2014 line in the case where we are plotting MSR (passive v starforming)
-            if xQuantityName == 'Mstellar' and yQuantityName == 're' and colorType == "Passive":
+            if xQuantityName == 'Mstellar' and (yQuantityName == 're' or yQuantityName == 're_converted') and colorType == "Passive":
                 self.plotVanDerWelLines()
             # Return data counts (used when running test suite)
             xA = aXVals.shape[0]

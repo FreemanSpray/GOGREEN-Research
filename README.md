@@ -1,12 +1,10 @@
-# GalaxyResearch
-Christian Harris
+# Mass-Size Relation
+Owner: Freeman Spray
+Original Author: Christian Harris
 KU Galaxy Evolution Group
 
-Allocated Work Times:
-WRF 10:30-1
-
 Trello:
-https://trello.com/b/gBKIhLKA/galaxy-research
+https://trello.com/b/9RsNSp7y/mass-size-relation
 
 Google Doc:
-https://docs.google.com/document/d/1nZ1pURFbZPA4zvD4q2NzCLrxk3oZRkZybOCYcl6liaQ/edit?usp=sharing-
+https://docs.google.com/document/d/1OdkeztJv5itMdiXcmAAQ4W6paJW4Zb6kQUSx8cHMLPo/edit
