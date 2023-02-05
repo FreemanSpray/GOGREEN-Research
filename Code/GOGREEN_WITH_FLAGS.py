@@ -248,7 +248,8 @@ class GOGREEN:
         :return:                   Pandas DataFrame containing the galaxies whose values meet the criteria within param:additionalCriteria
                                    and the standard criteria (if param:useStandards is True)
         """
-        #print(frame)
+        # Reinitialize flag
+        self.catalog['goodData'] = 1
         if (additionalCriteria != None):
             for criteria in additionalCriteria:
                 reduced = self.catalog.query(criteria)
@@ -256,9 +257,7 @@ class GOGREEN:
         if useStandards:
             for criteria in self.standardCriteria:
                 reduced = self.catalog.query(criteria)
-                #print(frame['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
                 self.catalog['goodData'] = self.catalog['goodData'] & (self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)) # https://www.geeksforgeeks.org/python-pandas-series-astype-to-convert-data-type-of-series/
-        #print(frame[frame.goodData == 1])
         return self.catalog
     # END REDUCEDF
         
@@ -374,10 +373,10 @@ class GOGREEN:
         plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=60, marker='d', color='green')
         plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
         plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSBG')
-        plt.plot([0, 2], [2, 5.5], linestyle='dashed', color='black')
-        plt.plot([0, 2], [1.5, 5], linestyle='dashed', color='black')
+        plt.plot([0.2, 2], [2, 5.5], linestyle='dashed', color='black')
+        plt.plot([0.2, 2], [1.5, 5], linestyle='dashed', color='black')
         plt.fill_between([0, 2], [1.5, 5], [2, 5.5], color='green', alpha=0.1)
-        plt.xlim(0, 2)
+        plt.xlim(0.2, 2)
         plt.ylim(1, 6)
         plt.legend()
 
@@ -402,7 +401,7 @@ class GOGREEN:
         plt.fill_between([0.7, 1], [1.2, 1.45], [1.85, 1.45], color='orange', alpha=0.1)
         plt.fill_between([0.6, 0.7], [1.3, 1.2], [1.95, 1.85], color='orange', alpha=0.1)
         plt.xlim(0.25, 2.25)
-        plt.ylim(0.5, 2.5)
+        plt.ylim(0.5, 2.6)
         plt.legend()
     #END PLOTMCNABPLOTS
 
