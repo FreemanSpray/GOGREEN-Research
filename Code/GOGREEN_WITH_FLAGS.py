@@ -348,37 +348,61 @@ class GOGREEN:
         # For each cluster, add members and non-members to respective dataframes
         for clusterName in self._structClusterNames:
             members = members.append(self.getMembers(clusterName))
+        # Print total number of member galaxies being considered
+        print(members.query('goodData == 1').shape)
         # Extract desired quantities from data
-        passiveMembers = members.query('passive == 1 and goodData == 1')
-        starFormingMembers = members.query('starForming == 1 and goodData == 1')
-        greenValleyMembers = members.query('greenValley == 1 and goodData == 1')
-        blueQuiescentMembers = members.query('blueQuiescent == 1 and goodData == 1')
-        postStarBurstMembers = members.query('postStarBurst == 1 and goodData == 1')
+        passiveMembersBad = members.query('passive == 1 and goodData == 1 and Mstellar <= 1.6e10')
+        starFormingMembersBad = members.query('starForming == 1 and goodData == 1 and Mstellar <= 1.6e10')
+        greenValleyMembersBad = members.query('greenValley == 1 and goodData == 1 and Mstellar <= 1.6e10')
+        blueQuiescentMembersBad = members.query('blueQuiescent == 1 and goodData == 1 and Mstellar <= 1.6e10')
+        postStarBurstMembersBad = members.query('postStarBurst == 1 and goodData == 1 and Mstellar <= 1.6e10')
+
+        passiveMembersGood = members.query('passive == 1 and goodData == 1 and Mstellar > 1.6e10')
+        starFormingMembersGood = members.query('starForming == 1 and goodData == 1 and Mstellar > 1.6e10')
+        greenValleyMembersGood = members.query('greenValley == 1 and goodData == 1 and Mstellar > 1.6e10')
+        blueQuiescentMembersGood = members.query('blueQuiescent == 1 and goodData == 1 and Mstellar > 1.6e10')
+        postStarBurstMembersGood = members.query('postStarBurst == 1 and goodData == 1 and Mstellar > 1.6e10')
 
         plt.figure()
-        plt.scatter(passiveMembers['VMINJ'], passiveMembers['NUVMINV'], alpha=0.5, color='red')
-        plt.scatter(starFormingMembers['VMINJ'], starFormingMembers['NUVMINV'], alpha=0.5, color='blue')
-        plt.scatter(greenValleyMembers['VMINJ'], greenValleyMembers['NUVMINV'], alpha=0.5, color='green')
-        plt.scatter(blueQuiescentMembers['VMINJ'], blueQuiescentMembers['NUVMINV'], alpha=0.5, color='yellow')
-        plt.scatter(postStarBurstMembers['VMINJ'], postStarBurstMembers['NUVMINV'], alpha=0.5, color='purple')
-        plt.plot([0, 1.75], [2, 5], linestyle='dashed', color='black')
-        plt.plot([0, 1.75], [1.5, 4.5], linestyle='dashed', color='black')
+        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=15, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['NUVMINV'], alpha=0.5, s=15, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['NUVMINV'], alpha=0.5, s=15, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['NUVMINV'], alpha=0.5, s=15, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['NUVMINV'], alpha=0.5, s=15, marker='x', color='purple')
+        plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['NUVMINV'], alpha=0.5, s=60, marker='o', color='red')
+        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['NUVMINV'], alpha=0.5, s=60, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=60, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSBG')
+        plt.plot([0, 2], [2, 5.5], linestyle='dashed', color='black')
+        plt.plot([0, 2], [1.5, 5], linestyle='dashed', color='black')
+        plt.fill_between([0, 2], [1.5, 5], [2, 5.5], color='green', alpha=0.1)
         plt.xlim(0, 2)
         plt.ylim(1, 6)
         plt.legend()
 
         plt.figure()
-        plt.scatter(passiveMembers['VMINJ'], passiveMembers['UMINV'], alpha=0.5, color='red')
-        plt.scatter(starFormingMembers['VMINJ'], starFormingMembers['UMINV'], alpha=0.5, color='blue')
-        plt.scatter(greenValleyMembers['VMINJ'], greenValleyMembers['UMINV'], alpha=0.5, color='green')
-        plt.scatter(blueQuiescentMembers['VMINJ'], blueQuiescentMembers['UMINV'], alpha=0.5, color='yellow')
-        plt.scatter(postStarBurstMembers['VMINJ'], postStarBurstMembers['UMINV'], alpha=0.5, color='purple')
-        plt.plot([0, 1.75], [2, 5], linestyle='dashed', color='black') # top left
-        plt.plot([0.7, 1], [1.2, 1.65], linestyle='dashed', color='black') # bottom right
-        plt.plot([0.6, 1], [1.45, 1.9], linestyle='dashed', color='black') # top right
-        plt.plot([0.3, 0.7], [1.2, 1.65], linestyle='dashed', color='black') # bottom left
-        plt.xlim(0, 2)
-        plt.ylim(1, 6)
+        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['UMINV'], alpha=0.5, s=15, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['UMINV'], alpha=0.5, s=15, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['UMINV'], alpha=0.5, s=15, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=15, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=15, marker='x', color='purple')
+        plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['UMINV'], alpha=0.5, s=30, marker='o', color='red', label='Q')
+        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['UMINV'], alpha=0.5, s=60, marker='*',  color='blue', label='SF')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['UMINV'], alpha=0.5, s=60, marker='d', color='green', label='GV')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=60, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=60, marker='x', color='purple')
+        #xPoints = [0.3, 0.6, 0.7, 1]
+        #yPoints = [1.65, 1.95, 1.2, 1.45]
+        plt.plot([0.3, 0.6], [1.65, 1.95], linestyle='dashed', color='black') # top left
+        plt.plot([0.7, 1], [1.2, 1.45], linestyle='dashed', color='black') # bottom right
+        plt.plot([0.6, 1], [1.95, 1.45], linestyle='dashed', color='black') # top right
+        plt.plot([0.3, 0.7], [1.65, 1.2], linestyle='dashed', color='black') # bottom left
+        plt.fill_between([0.3, 0.6], [1.65, 1.3], [1.65, 1.95], color='orange', alpha=0.1)
+        plt.fill_between([0.7, 1], [1.2, 1.45], [1.85, 1.45], color='orange', alpha=0.1)
+        plt.fill_between([0.6, 0.7], [1.3, 1.2], [1.95, 1.85], color='orange', alpha=0.1)
+        plt.xlim(0.25, 2.25)
+        plt.ylim(0.5, 2.5)
         plt.legend()
     #END PLOTMCNABPLOTS
 
