@@ -1104,8 +1104,8 @@ class GOGREEN:
                     mass = aXVals[i]
                     size = aYVals[i]
                     sigma = aYsigmas[i]
-                    upperSigma = np.log10(size + sigma) - np.log10(size)
-                    lowerSigma = np.log10(size) - np.log10(size - sigma)
+                    upperSigma = np.log10(pow(10, size) + sigma) - np.log10(pow(10, size))
+                    lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
                     else:
