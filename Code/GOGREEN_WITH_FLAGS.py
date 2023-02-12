@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import os
 import warnings
+import scipy.optimize as opt
 
 
 
@@ -210,10 +211,10 @@ class GOGREEN:
         allClusterGalaxies = self.getClusterGalaxies(clusterName)
         # Find spectroscopic and photometric members seperately
         # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
-        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) < 0.02*(1+allClusterGalaxies['zspec'].values)
+        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) <= 0.02*(1+allClusterGalaxies['zspec'].values)
         specZgalaxies = allClusterGalaxies[specZthreshold]
         # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
-        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) < 0.08*(1+allClusterGalaxies['zphot'].values)
+        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.08*(1+allClusterGalaxies['zphot'].values)
         photZgalaxies = allClusterGalaxies[photZthreshold]
         # Remove photZgalaxies with a specZ
         photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
@@ -375,7 +376,9 @@ class GOGREEN:
         plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSBG')
         plt.plot([0.2, 2], [2, 5.5], linestyle='dashed', color='black')
         plt.plot([0.2, 2], [1.5, 5], linestyle='dashed', color='black')
-        plt.fill_between([0, 2], [1.5, 5], [2, 5.5], color='green', alpha=0.1)
+        plt.fill_between([0.2, 2], [1.5, 5], [2, 5.5], color='green', alpha=0.1)
+        plt.xlabel("(V-J)")
+        plt.ylabel("(NUV-V)")
         plt.xlim(0.2, 2)
         plt.ylim(1, 6)
         plt.legend()
@@ -400,6 +403,8 @@ class GOGREEN:
         plt.fill_between([0.3, 0.6], [1.65, 1.3], [1.65, 1.95], color='orange', alpha=0.1)
         plt.fill_between([0.7, 1], [1.2, 1.45], [1.85, 1.45], color='orange', alpha=0.1)
         plt.fill_between([0.6, 0.7], [1.3, 1.2], [1.95, 1.85], color='orange', alpha=0.1)
+        plt.xlabel("(V-J)")
+        plt.ylabel("(U-V)")
         plt.xlim(0.25, 2.25)
         plt.ylim(0.5, 2.6)
         plt.legend()
@@ -483,8 +488,21 @@ class GOGREEN:
             if np.isinf(weights[i]):
                 weights[i] = 0 #setting to 0 because this data point should not be used
             if np.isnan(weights[i]):
-                weights[i] = 0 #setting to 0 because this data point should not be used      
+                weights[i] = 0 #setting to 0 because this data point should not be used  
         s = np.polynomial.polynomial.Polynomial.fit(x=mass, y=size, deg=1, w=weights)
+        coefs = s.convert().coef
+        intercept = coefs[0]
+        slope = coefs[1]
+        print((slope, intercept))
+        for i in range(0, len(errs)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
+            if np.isinf(errs[i]):
+                weights[i] = 100000 #setting to arbitrarily high because this data point should not be used
+            if np.isnan(errs[i]):
+                weights[i] = 100000 #setting to arbitrarily high because this data point should not be used  
+        # Note: we define bounds here because this causes the default fitting method to be changed to trf, which in 
+        # turn causes the function to call scipy.optimize.least_squares internally, which can take the loss param
+        s = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
+        print(s)
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -493,21 +511,18 @@ class GOGREEN:
                     self.bootstrap(mass, size, weights, axes, row, col, lineColor=color)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
-                    axes[row][col].plot(mass, s(mass), color='white', linewidth=4)
+                    axes[row][col].plot(mass, intercept + slope*mass, color='white', linewidth=4)
                 # Plot the best fit line
-                axes[row][col].plot(mass, s(mass), color=color, label=lbl)
+                axes[row][col].plot(mass, intercept + slope*mass, color=color, label=lbl)
                 return
         if bootstrap:
             # Bootstrapping calculation
             self.bootstrap(mass, size, weights, axes, row, col, lineColor=color)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
-            plt.plot(mass, s(mass), color='white', linewidth=4)
+            plt.plot(mass, intercept + slope*mass, color='white', linewidth=4)
         # Plot the best fit line
-        plt.plot(mass, s(mass), color=color, label=lbl)
-        coefs = s.convert().coef
-        b = coefs[0]
-        m = coefs[1]
+        plt.plot(mass, intercept + slope*mass, color=color, label=lbl)
         return m, b
     # END MSRFIT
 
