@@ -496,13 +496,15 @@ class GOGREEN:
         print((slope, intercept))
         for i in range(0, len(errs)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
             if np.isinf(errs[i]):
-                weights[i] = 100000 #setting to arbitrarily high because this data point should not be used
+                errs[i] = 100000 #setting to arbitrarily high because this data point should not be used
             if np.isnan(errs[i]):
-                weights[i] = 100000 #setting to arbitrarily high because this data point should not be used  
+                errs[i] = 100000 #setting to arbitrarily high because this data point should not be used  
         # Note: we define bounds here because this causes the default fitting method to be changed to trf, which in 
         # turn causes the function to call scipy.optimize.least_squares internally, which can take the loss param
-        s = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
-        print(s)
+        #s = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
+        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size)
+        slope = s[0]
+        intercept = s[1]
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -523,7 +525,7 @@ class GOGREEN:
             plt.plot(mass, intercept + slope*mass, color='white', linewidth=4)
         # Plot the best fit line
         plt.plot(mass, intercept + slope*mass, color=color, label=lbl)
-        return m, b
+        return slope, intercept
     # END MSRFIT
 
     def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None, lineColor:str=None):
