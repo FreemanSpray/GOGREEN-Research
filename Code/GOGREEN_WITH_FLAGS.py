@@ -343,25 +343,24 @@ class GOGREEN:
         """
         # Reduce according to criteria
         self.reduceDF(None, True)
-        # Initialize dataframes            
-        members = pd.DataFrame()
-        # For each cluster, add members and non-members to respective dataframes
-        for clusterName in self._structClusterNames:
-            members = members.append(self.getMembers(clusterName))
-        # Print total number of member galaxies being considered
-        print(members.query('goodData == 1').shape)
+        # Initialize dataframe of all members       
+        members = self.catalog.query('member == 1')
+        print(members.shape)
+        # Reduce to set of good data
+        members = members.query('goodData == 1')
+        print(members.shape)
         # Extract desired quantities from data
-        passiveMembersBad = members.query('passive == 1 and goodData == 1 and Mstellar <= 1.6e10')
-        starFormingMembersBad = members.query('starForming == 1 and goodData == 1 and Mstellar <= 1.6e10')
-        greenValleyMembersBad = members.query('greenValley == 1 and goodData == 1 and Mstellar <= 1.6e10')
-        blueQuiescentMembersBad = members.query('blueQuiescent == 1 and goodData == 1 and Mstellar <= 1.6e10')
-        postStarBurstMembersBad = members.query('postStarBurst == 1 and goodData == 1 and Mstellar <= 1.6e10')
+        passiveMembersBad = members.query('passive == 1 and Mstellar <= 1.6e10')
+        starFormingMembersBad = members.query('starForming == 1 and Mstellar <= 1.6e10')
+        greenValleyMembersBad = members.query('greenValley == 1 and Mstellar <= 1.6e10')
+        blueQuiescentMembersBad = members.query('blueQuiescent == 1 and Mstellar <= 1.6e10')
+        postStarBurstMembersBad = members.query('postStarBurst == 1 and Mstellar <= 1.6e10')
 
-        passiveMembersGood = members.query('passive == 1 and goodData == 1 and Mstellar > 1.6e10')
-        starFormingMembersGood = members.query('starForming == 1 and goodData == 1 and Mstellar > 1.6e10')
-        greenValleyMembersGood = members.query('greenValley == 1 and goodData == 1 and Mstellar > 1.6e10')
-        blueQuiescentMembersGood = members.query('blueQuiescent == 1 and goodData == 1 and Mstellar > 1.6e10')
-        postStarBurstMembersGood = members.query('postStarBurst == 1 and goodData == 1 and Mstellar > 1.6e10')
+        passiveMembersGood = members.query('passive == 1 and Mstellar > 1.6e10')
+        starFormingMembersGood = members.query('starForming == 1 and Mstellar > 1.6e10')
+        greenValleyMembersGood = members.query('greenValley == 1 and Mstellar > 1.6e10')
+        blueQuiescentMembersGood = members.query('blueQuiescent == 1 and Mstellar > 1.6e10')
+        postStarBurstMembersGood = members.query('postStarBurst == 1 and Mstellar > 1.6e10')
 
         plt.figure()
         plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=15, marker='o', color='red')
@@ -495,14 +494,17 @@ class GOGREEN:
         slope = coefs[1]
         print((slope, intercept))
         for i in range(0, len(errs)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
+            #errs[i] = 1 # NOTE: temp, for testing/display purposes
             if np.isinf(errs[i]):
-                errs[i] = 100000 #setting to arbitrarily high because this data point should not be used
+                errs[i] = 10000 #setting to arbitrarily high because this data point should not be used
             if np.isnan(errs[i]):
-                errs[i] = 100000 #setting to arbitrarily high because this data point should not be used  
+                errs[i] = 10000 #setting to arbitrarily high because this data point should not be used
+        print(errs)  
         # Note: we define bounds here because this causes the default fitting method to be changed to trf, which in 
         # turn causes the function to call scipy.optimize.least_squares internally, which can take the loss param
-        #s = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
-        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size)
+        #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
+        #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, sigma=errs)
+        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], bounds=([-10, -10], [10, 10]), loss="huber")
         slope = s[0]
         intercept = s[1]
         if row != None and col != None:
