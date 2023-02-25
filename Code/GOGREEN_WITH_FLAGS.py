@@ -113,8 +113,13 @@ class GOGREEN:
         self.catalog = self.catalog.replace(100000000000000000000, np.nan)
         # Generate flags for use in plotting
         self.generateFlags()
+        # Set error values (necessary because the re_err values from Galfit are not adequate)
+        self.setReErr()
         # Generate unit conversion fields for use in effective radius plots.
         self.reConvert()
+        self.catalog['re_frac_err'] = self.catalog['re_err']/self.catalog['re']
+        self.catalog['re_frac_err_converted'] = self.catalog['re_err_converted']/self.catalog['re_converted']
+
     # END INIT
 
     def generateFlags(self):
@@ -148,6 +153,10 @@ class GOGREEN:
         self.catalog['elliptical'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
         reduced = self.catalog.query(spiralQuery)
         self.catalog['spiral'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        self.catalog['member_adjusted'] = 0
+        for clusterName in self._structClusterNames:
+            reduced = self.getMembers(clusterName, 2)
+            self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int) + self.catalog['member_adjusted'] 
     # END GENERATEFLAGS
 
     def generateDF(self, filePath:str) -> pd.DataFrame:
@@ -198,7 +207,7 @@ class GOGREEN:
         return targetCluster['Redshift'].values[0]
     # END GETCLUSTERZ
 
-    def getMembers(self, clusterName:str) -> pd.DataFrame:
+    def getMembers(self, clusterName:str, offset:float=1) -> pd.DataFrame:
         """
         getMembers Gets the member galaxies of a cluster based on the galaxy redshift with respect to the
                    best estimate of the cluster redshift. Spectroscopic members are those with (zspec-zclust) < 0.02(1+zspec)
@@ -211,10 +220,10 @@ class GOGREEN:
         allClusterGalaxies = self.getClusterGalaxies(clusterName)
         # Find spectroscopic and photometric members seperately
         # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
-        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) <= 0.02*(1+allClusterGalaxies['zspec'].values)
+        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) <= offset*0.02*(1+allClusterGalaxies['zspec'].values)
         specZgalaxies = allClusterGalaxies[specZthreshold]
         # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
-        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.08*(1+allClusterGalaxies['zphot'].values)
+        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= offset*0.08*(1+allClusterGalaxies['zphot'].values)
         photZgalaxies = allClusterGalaxies[photZthreshold]
         # Remove photZgalaxies with a specZ
         photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
@@ -343,24 +352,33 @@ class GOGREEN:
         """
         # Reduce according to criteria
         self.reduceDF(None, True)
-        # Initialize dataframe of all members       
-        members = self.catalog.query('member == 1')
-        print(members.shape)
+        print(self.catalog.query('goodData == 1').shape[0])
         # Reduce to set of good data
-        members = members.query('goodData == 1')
-        print(members.shape)
+        table = pd.DataFrame()
+        table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
+        table['Total Sample'] = [self.catalog.query('goodData == 1 and starForming == 1').shape[0], 
+            self.catalog.query('goodData == 1 and passive == 1').shape[0], 
+            self.catalog.query('goodData == 1 and greenValley == 1').shape[0], 
+            self.catalog.query('goodData == 1 and blueQuiescent == 1').shape[0], 
+            self.catalog.query('goodData == 1 and postStarBurst == 1').shape[0]]
+        table['Cluster Members'] = [self.catalog.query('goodData == 1 and starForming == 1').shape[0], 
+            self.catalog.query('goodData == 1 and passive == 1').shape[0], 
+            self.catalog.query('goodData == 1 and greenValley == 1').shape[0], 
+            self.catalog.query('goodData == 1 and blueQuiescent == 1').shape[0], 
+            self.catalog.query('goodData == 1 and postStarBurst == 1').shape[0]]
+        print(table)
         # Extract desired quantities from data
-        passiveMembersBad = members.query('passive == 1 and Mstellar <= 1.6e10')
-        starFormingMembersBad = members.query('starForming == 1 and Mstellar <= 1.6e10')
-        greenValleyMembersBad = members.query('greenValley == 1 and Mstellar <= 1.6e10')
-        blueQuiescentMembersBad = members.query('blueQuiescent == 1 and Mstellar <= 1.6e10')
-        postStarBurstMembersBad = members.query('postStarBurst == 1 and Mstellar <= 1.6e10')
+        passiveMembersBad = self.catalog.query('goodData == 1 and passive == 1 and Mstellar <= 1.6e10')
+        starFormingMembersBad = self.catalog.query('goodData == 1 and starForming == 1 and Mstellar <= 1.6e10')
+        greenValleyMembersBad = self.catalog.query('goodData == 1 and greenValley == 1 and Mstellar <= 1.6e10')
+        blueQuiescentMembersBad = self.catalog.query('goodData == 1 and blueQuiescent == 1 and Mstellar <= 1.6e10')
+        postStarBurstMembersBad = self.catalog.query('goodData == 1 and postStarBurst == 1 and Mstellar <= 1.6e10')
 
-        passiveMembersGood = members.query('passive == 1 and Mstellar > 1.6e10')
-        starFormingMembersGood = members.query('starForming == 1 and Mstellar > 1.6e10')
-        greenValleyMembersGood = members.query('greenValley == 1 and Mstellar > 1.6e10')
-        blueQuiescentMembersGood = members.query('blueQuiescent == 1 and Mstellar > 1.6e10')
-        postStarBurstMembersGood = members.query('postStarBurst == 1 and Mstellar > 1.6e10')
+        passiveMembersGood = self.catalog.query('goodData == 1 and passive == 1 and Mstellar > 1.6e10')
+        starFormingMembersGood = self.catalog.query('goodData == 1 and starForming == 1 and Mstellar > 1.6e10')
+        greenValleyMembersGood = self.catalog.query('goodData == 1 and greenValley == 1 and Mstellar > 1.6e10')
+        blueQuiescentMembersGood = self.catalog.query('goodData == 1 and blueQuiescent == 1 and Mstellar > 1.6e10')
+        postStarBurstMembersGood = self.catalog.query('goodData == 1 and postStarBurst == 1 and Mstellar > 1.6e10')
 
         plt.figure()
         plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=15, marker='o', color='red')
@@ -372,7 +390,7 @@ class GOGREEN:
         plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['NUVMINV'], alpha=0.5, s=60, marker='*',  color='blue')
         plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=60, marker='d', color='green')
         plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
-        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSBG')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSB')
         plt.plot([0.2, 2], [2, 5.5], linestyle='dashed', color='black')
         plt.plot([0.2, 2], [1.5, 5], linestyle='dashed', color='black')
         plt.fill_between([0.2, 2], [1.5, 5], [2, 5.5], color='green', alpha=0.1)
@@ -408,6 +426,30 @@ class GOGREEN:
         plt.ylim(0.5, 2.6)
         plt.legend()
     #END PLOTMCNABPLOTS
+
+    def setReErr(self):
+        """
+        Assign error values for Effective Radius (Re) measurements. These values are taken from van der Wel et. al. 2012, Table 3
+        :return   :    values are set in the catalog
+        """
+        print(self.catalog[self.catalog['re'] > 0])
+        self.catalog['re_err_robust'] = np.nan
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 21) and (self.catalog['re'].values < 0.3), 0.01, self.catalog.re_err_robust.values) #https://numpy.org/doc/stable/reference/generated/numpy.where.html
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 21) and (self.catalog['re'].values > 0.3), 0.00, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 22) and (self.catalog['re'].values < 0.3), 0.02, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 22) and (self.catalog['re'].values > 0.3), -0.01, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 23) and (self.catalog['re'].values < 0.3), 0.00, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 23) and (self.catalog['re'].values > 0.3), -0.03, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 24) and (self.catalog['re'].values < 0.3), 0.01, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 24) and (self.catalog['re'].values > 0.3), -0.10, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 25) and (self.catalog['re'].values < 0.3), 0.04, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 25) and (self.catalog['re'].values > 0.3), -0.09, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 26) and (self.catalog['re'].values < 0.3), 0.12, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 26) and (self.catalog['re'].values > 0.3), -0.11, self.catalog.re_err_robust.values)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 27) and (self.catalog['re'].values < 0.3), 0.27, self.catalog.re_err_robust.values)
+        print(np.isnan(self.catalog['re_err_robust']))
+        
+    #END SETREERR
 
     def reConvert(self):
         """
@@ -502,9 +544,9 @@ class GOGREEN:
         print(errs)  
         # Note: we define bounds here because this causes the default fitting method to be changed to trf, which in 
         # turn causes the function to call scipy.optimize.least_squares internally, which can take the loss param
-        #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
+        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
         #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, sigma=errs)
-        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], bounds=([-10, -10], [10, 10]), loss="huber")
+        #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], bounds=([-10, -10], [10, 10]), loss="huber")
         slope = s[0]
         intercept = s[1]
         if row != None and col != None:
@@ -1003,21 +1045,17 @@ class GOGREEN:
             print("test failed due to unspecified error case.")
     # END TEST
     
-    def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, additionalCriteria:list=None, colorType:str=None, useStandards:bool=True, useLog:list=[False,False], fitLine:bool=False,
+    def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, colorType:str=None, useLog:list=[False,False], fitLine:bool=False,
         data:pd.DataFrame=None, color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, bootstrap:bool=True, plotErrBars:bool=False,):
             """
             Helper function called by plot. Handles the plotting of data.
                 
             :param xQuantityName:      Name of the column whose values are to be used as the x
             :param yQuantityName:      Name of the column whose values are to be used as the y
-            :param additionalCriteria: List of desired criteria the plotted galaxies should meet
-                                        Default: None
             :param colorType:          Specifies how to color code the plotted galaxies
                                         Default: None
                                         Value:   'membership' - spectroscopic member vs photometric member
                                         Value:   'passive' - passive vs star forming
-            :param useStandards:       Flag to indicate whether the standard search criteria should be applied
-                                        Default: True
             :param useLog:             Flag to indicate whether the x- or y-axis should be in log scale
                                         Default: [False,False] - neither axis in log scale
                                         Value:   [False,True] - y axis in log scale
@@ -1243,7 +1281,7 @@ class GOGREEN:
                 print(useMembers, " is not a valid membership requirement!")
                 return
             # Plot data
-            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars)
+            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars)
         # Plot all clusters individually in a subplot
         elif plotType == 2:
             # Initialize data count totals (used when running test suite)
@@ -1275,7 +1313,7 @@ class GOGREEN:
                         print(useMembers, " is not a valid membership requirement!")
                         return
                     # Plot data
-                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars)
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars)
                     # Update data count totals
                     xTot+=x
                     yTot+=y
@@ -1316,7 +1354,7 @@ class GOGREEN:
                 else:
                     print(useMembers, " is not a valid membership requirement!")
                     return
-            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, additionalCriteria, colorType, useStandards, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars)
+            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars)
         else:
             print(plotType, " is not a valid plotting scheme!")
             return
