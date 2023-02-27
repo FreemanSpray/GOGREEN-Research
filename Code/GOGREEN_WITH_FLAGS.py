@@ -117,7 +117,7 @@ class GOGREEN:
         self.setReErr()
         # Generate unit conversion fields for use in effective radius plots.
         self.reConvert()
-        self.catalog['re_frac_err'] = self.catalog['re_err']/self.catalog['re']
+        self.catalog['re_frac_err'] = self.catalog['re_err_robust']/self.catalog['re']
         self.catalog['re_frac_err_converted'] = self.catalog['re_err_robust_converted']/self.catalog['re_converted']
 
     # END INIT
@@ -432,9 +432,8 @@ class GOGREEN:
         Assign error values for Effective Radius (Re) measurements. These values are taken from van der Wel et. al. 2012, Table 3
         :return   :    values are set in the catalog
         """
-        print(self.catalog[self.catalog['re'] > 0])
         self.catalog['re_err_robust'] = np.nan
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust) #https://numpy.org/doc/stable/reference/generated/numpy.where.html
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust) #https://stackoverflow.com/questions/12307099/modifying-a-subset-of-rows-in-a-pandas-dataframe
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re > 0.3), 0.00, self.catalog.re_err_robust)
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re < 0.3), 0.02, self.catalog.re_err_robust)
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), -0.01, self.catalog.re_err_robust)
@@ -447,7 +446,6 @@ class GOGREEN:
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), 0.12, self.catalog.re_err_robust)
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), -0.11, self.catalog.re_err_robust)
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), 0.27, self.catalog.re_err_robust)
-        print(self.catalog[self.catalog['re_err_robust'] > 0.2])
         
     #END SETREERR
 
@@ -544,9 +542,10 @@ class GOGREEN:
         print(errs)  
         # Note: we define bounds here because this causes the default fitting method to be changed to trf, which in 
         # turn causes the function to call scipy.optimize.least_squares internally, which can take the loss param
-        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
+        #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], sigma=errs, bounds=([-10, -10], [10, 10]), loss="soft_l1")
         #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, sigma=errs)
-        #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=[slope, intercept], bounds=([-10, -10], [10, 10]), loss="huber")
+        guessVals = [slope, intercept]
+        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=guessVals, bounds=([-10, -10], [10, 10]), loss="huber")
         slope = s[0]
         intercept = s[1]
         if row != None and col != None:
@@ -554,7 +553,8 @@ class GOGREEN:
             if axes[row][col] != None:
                 if bootstrap:
                     # Bootstrapping calculation
-                    self.bootstrap(mass, size, weights, axes, row, col, lineColor=color)
+                    #self.bootstrap(mass, size, weights, axes, row, col, lineColor=color, guessVals=guessVals)
+                    self.bootstrap(mass, size, errs, axes, row, col, lineColor=color, guessVals=guessVals)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
                     axes[row][col].plot(mass, intercept + slope*mass, color='white', linewidth=4)
@@ -563,7 +563,8 @@ class GOGREEN:
                 return
         if bootstrap:
             # Bootstrapping calculation
-            self.bootstrap(mass, size, weights, axes, row, col, lineColor=color)
+            #self.bootstrap(mass, size, weights, axes, row, col, lineColor=color, guessVals=guessVals)
+            self.bootstrap(mass, size, errs, axes, row, col, lineColor=color, guessVals=guessVals)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
             plt.plot(mass, intercept + slope*mass, color='white', linewidth=4)
@@ -572,7 +573,7 @@ class GOGREEN:
         return slope, intercept
     # END MSRFIT
 
-    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None, lineColor:str=None):
+    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None, lineColor:str=None, guessVals:list=None):
         """
         bootstrap obtains a measure of error of the line-fitting equation ...
         
@@ -619,11 +620,11 @@ class GOGREEN:
                 boostrapE = error[randIndices]
                 # Fit data with equation
                 try:
-                    #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
-                    s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
-                    coefs = s.convert().coef
-                    b = coefs[0]
-                    m = coefs[1]
+                    #s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
+                    s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
+                    #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, bounds=([-10, -10], [10, 10]), loss="huber")
+                    m = s[0]
+                    b = s[1]
                     # Store coefficients
                     intercepts[i] = b
                     slopes[i] = m
@@ -1152,8 +1153,8 @@ class GOGREEN:
             if plotErrBars:
                 # Extract error values
                 if yQuantityName == 're':
-                    aYsigmas = aData['re_err'].values
-                    bYsigmas = bData['re_err'].values
+                    aYsigmas = aData['re_err_robust'].values
+                    bYsigmas = bData['re_err_robust'].values
                 elif yQuantityName == 're_converted':
                     aYsigmas = aData['re_err_robust_converted'].values
                     bYsigmas = bData['re_err_robust_converted'].values
