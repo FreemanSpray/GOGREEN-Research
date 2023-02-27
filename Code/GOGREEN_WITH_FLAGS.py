@@ -118,7 +118,7 @@ class GOGREEN:
         # Generate unit conversion fields for use in effective radius plots.
         self.reConvert()
         self.catalog['re_frac_err'] = self.catalog['re_err']/self.catalog['re']
-        self.catalog['re_frac_err_converted'] = self.catalog['re_err_converted']/self.catalog['re_converted']
+        self.catalog['re_frac_err_converted'] = self.catalog['re_err_robust_converted']/self.catalog['re_converted']
 
     # END INIT
 
@@ -460,7 +460,7 @@ class GOGREEN:
 
         """
         sizes =  self.catalog['re'].values
-        errs = self.catalog['re_err'].values
+        errs = self.catalog['re_err_robust'].values
         length = len(sizes)
         # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
         sizes_converted = sizes * (cosmo.kpc_proper_per_arcmin(self.catalog['zspec'].values)/60)
@@ -475,7 +475,7 @@ class GOGREEN:
         sizes_converted = (sizes_converted / u.kpc) * u.arcmin
         errs_converted = (errs_converted / u.kpc) * u.arcmin
         self.catalog['re_converted'] = sizes_converted
-        self.catalog['re_err_converted'] = errs_converted
+        self.catalog['re_err_robust_converted'] = errs_converted
     #END RECONVERT
 
     def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, typeRestrict:str=None, color:str=None, bootstrap:bool=True):
@@ -514,7 +514,7 @@ class GOGREEN:
         # Extract values frmo data
         size = data['re_converted'].values
         mass = data['Mstellar'].values
-        errs = data['re_err_converted'].values
+        errs = data['re_err_robust_converted'].values
         # Calculate coefficients (slope and y-intercept)
         if useLog[0] == True:
             mass = np.log10(mass)
@@ -1155,8 +1155,8 @@ class GOGREEN:
                     aYsigmas = aData['re_err'].values
                     bYsigmas = bData['re_err'].values
                 elif yQuantityName == 're_converted':
-                    aYsigmas = aData['re_err_converted'].values
-                    bYsigmas = bData['re_err_converted'].values
+                    aYsigmas = aData['re_err_robust_converted'].values
+                    bYsigmas = bData['re_err_robust_converted'].values
                 for i in range(0, len(aXVals)):
                     mass = aXVals[i]
                     size = aYVals[i]
