@@ -434,20 +434,20 @@ class GOGREEN:
         """
         print(self.catalog[self.catalog['re'] > 0])
         self.catalog['re_err_robust'] = np.nan
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 21) and (self.catalog['re'].values < 0.3), 0.01, self.catalog.re_err_robust.values) #https://numpy.org/doc/stable/reference/generated/numpy.where.html
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 21) and (self.catalog['re'].values > 0.3), 0.00, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 22) and (self.catalog['re'].values < 0.3), 0.02, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 22) and (self.catalog['re'].values > 0.3), -0.01, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 23) and (self.catalog['re'].values < 0.3), 0.00, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 23) and (self.catalog['re'].values > 0.3), -0.03, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 24) and (self.catalog['re'].values < 0.3), 0.01, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 24) and (self.catalog['re'].values > 0.3), -0.10, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 25) and (self.catalog['re'].values < 0.3), 0.04, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 25) and (self.catalog['re'].values > 0.3), -0.09, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 26) and (self.catalog['re'].values < 0.3), 0.12, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 26) and (self.catalog['re'].values > 0.3), -0.11, self.catalog.re_err_robust.values)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog['mag'].values) == 27) and (self.catalog['re'].values < 0.3), 0.27, self.catalog.re_err_robust.values)
-        print(np.isnan(self.catalog['re_err_robust']))
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust) #https://numpy.org/doc/stable/reference/generated/numpy.where.html
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re > 0.3), 0.00, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re < 0.3), 0.02, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), -0.01, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re < 0.3), 0.00, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re > 0.3), -0.03, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re > 0.3), -0.10, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re < 0.3), 0.04, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re > 0.3), -0.09, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), 0.12, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), -0.11, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), 0.27, self.catalog.re_err_robust)
+        print(self.catalog[self.catalog['re_err_robust'] > 0.2])
         
     #END SETREERR
 
