@@ -352,7 +352,8 @@ class GOGREEN:
         """
         # Reduce according to criteria
         self.reduceDF(None, True)
-        print(self.catalog.query('goodData == 1').shape[0])
+        print("Total: " + str(self.catalog.query('goodData == 1').shape[0]))
+        print("Total members: " + str(self.catalog.query('member_adjusted == 1 and goodData == 1').shape[0]))
         # Reduce to set of good data
         table = pd.DataFrame()
         table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
@@ -361,24 +362,24 @@ class GOGREEN:
             self.catalog.query('goodData == 1 and greenValley == 1').shape[0], 
             self.catalog.query('goodData == 1 and blueQuiescent == 1').shape[0], 
             self.catalog.query('goodData == 1 and postStarBurst == 1').shape[0]]
-        table['Cluster Members'] = [self.catalog.query('goodData == 1 and starForming == 1').shape[0], 
-            self.catalog.query('goodData == 1 and passive == 1').shape[0], 
-            self.catalog.query('goodData == 1 and greenValley == 1').shape[0], 
-            self.catalog.query('goodData == 1 and blueQuiescent == 1').shape[0], 
-            self.catalog.query('goodData == 1 and postStarBurst == 1').shape[0]]
+        table['Cluster Members'] = [self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
         print(table)
         # Extract desired quantities from data
-        passiveMembersBad = self.catalog.query('goodData == 1 and passive == 1 and Mstellar <= 1.6e10')
-        starFormingMembersBad = self.catalog.query('goodData == 1 and starForming == 1 and Mstellar <= 1.6e10')
-        greenValleyMembersBad = self.catalog.query('goodData == 1 and greenValley == 1 and Mstellar <= 1.6e10')
-        blueQuiescentMembersBad = self.catalog.query('goodData == 1 and blueQuiescent == 1 and Mstellar <= 1.6e10')
-        postStarBurstMembersBad = self.catalog.query('goodData == 1 and postStarBurst == 1 and Mstellar <= 1.6e10')
+        passiveMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar <= 1.6e10')
+        starFormingMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar <= 1.6e10')
+        greenValleyMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar <= 1.6e10')
+        blueQuiescentMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar <= 1.6e10')
+        postStarBurstMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar <= 1.6e10')
 
-        passiveMembersGood = self.catalog.query('goodData == 1 and passive == 1 and Mstellar > 1.6e10')
-        starFormingMembersGood = self.catalog.query('goodData == 1 and starForming == 1 and Mstellar > 1.6e10')
-        greenValleyMembersGood = self.catalog.query('goodData == 1 and greenValley == 1 and Mstellar > 1.6e10')
-        blueQuiescentMembersGood = self.catalog.query('goodData == 1 and blueQuiescent == 1 and Mstellar > 1.6e10')
-        postStarBurstMembersGood = self.catalog.query('goodData == 1 and postStarBurst == 1 and Mstellar > 1.6e10')
+        passiveMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar > 1.6e10')
+        starFormingMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar > 1.6e10')
+        greenValleyMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar > 1.6e10')
+        blueQuiescentMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar > 1.6e10')
+        postStarBurstMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar > 1.6e10')
 
         plt.figure()
         plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=15, marker='o', color='red')
@@ -434,19 +435,18 @@ class GOGREEN:
         """
         self.catalog['re_err_robust'] = np.nan
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust) #https://stackoverflow.com/questions/12307099/modifying-a-subset-of-rows-in-a-pandas-dataframe
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re > 0.3), 0.00, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re > 0.3), 0.01, self.catalog.re_err_robust)
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re < 0.3), 0.02, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), -0.01, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re < 0.3), 0.00, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re > 0.3), -0.03, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re > 0.3), -0.10, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re < 0.3), 0.04, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re > 0.3), -0.09, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), 0.12, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), -0.11, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), 0.27, self.catalog.re_err_robust)
-        
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), 0.02, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re < 0.3), 0.03, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re > 0.3), 0.06, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re < 0.3), 0.08, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re > 0.3), 0.15, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re < 0.3), 0.18, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re > 0.3), 0.33, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), 0.42, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), 0.63, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), 0.76, self.catalog.re_err_robust)
     #END SETREERR
 
     def reConvert(self):
@@ -539,6 +539,8 @@ class GOGREEN:
                 errs[i] = 10000 #setting to arbitrarily high because this data point should not be used
             if np.isnan(errs[i]):
                 errs[i] = 10000 #setting to arbitrarily high because this data point should not be used
+        # Convert to fractional errors
+        errs = errs/size
         print(errs)  
         # Note: we define bounds here because this causes the default fitting method to be changed to trf, which in 
         # turn causes the function to call scipy.optimize.least_squares internally, which can take the loss param
@@ -621,8 +623,8 @@ class GOGREEN:
                 # Fit data with equation
                 try:
                     #s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
-                    s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
-                    #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, bounds=([-10, -10], [10, 10]), loss="huber")
+                    #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
+                    s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, bounds=([-10, -10], [10, 10]), loss="huber")
                     m = s[0]
                     b = s[1]
                     # Store coefficients
@@ -1158,6 +1160,11 @@ class GOGREEN:
                 elif yQuantityName == 're_converted':
                     aYsigmas = aData['re_err_robust_converted'].values
                     bYsigmas = bData['re_err_robust_converted'].values
+                    aYmags = aData['mag'].values
+                    bYmags = bData['mag'].values
+                    aYres = aData['re'].values
+                    bYres = bData['re'].values
+                print("===quiescent===")
                 for i in range(0, len(aXVals)):
                     mass = aXVals[i]
                     size = aYVals[i]
@@ -1166,9 +1173,13 @@ class GOGREEN:
                     lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
+                        print("magnitude: " + str(aYmags[i]))
+                        print("Re: " + str(aYres[i]))
+                        print("Err: " + str(aYsigmas[i]))
                     else:
                         plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='red')
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='red')
+                print("===star-forming===")
                 for i in range(0, len(bXVals)):
                     mass = bXVals[i]
                     size = bYVals[i]
@@ -1177,6 +1188,11 @@ class GOGREEN:
                     lowerSigma = np.log10(size) - np.log10(size - sigma)
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
+                        print("magnitude: " + str(bYmags[i]))
+                        print("Re: " + str(bYres[i]))
+                        print("Err: " + str(bYsigmas[i]))
+                        print("Upper nan: " + str(np.isnan(upperSigma)))
+                        print("Lower nan: " + str(np.isnan(lowerSigma)))
                     else:
                         plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='blue')
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
