@@ -207,7 +207,7 @@ class GOGREEN:
         return targetCluster['Redshift'].values[0]
     # END GETCLUSTERZ
 
-    def getMembers(self, clusterName:str, offset:float=1) -> pd.DataFrame:
+    def getMembers(self, clusterName:str, mcnab:float=1) -> pd.DataFrame:
         """
         getMembers Gets the member galaxies of a cluster based on the galaxy redshift with respect to the
                    best estimate of the cluster redshift. Spectroscopic members are those with (zspec-zclust) < 0.02(1+zspec)
@@ -220,13 +220,19 @@ class GOGREEN:
         allClusterGalaxies = self.getClusterGalaxies(clusterName)
         # Find spectroscopic and photometric members seperately
         # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
-        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) <= offset*0.02*(1+allClusterGalaxies['zspec'].values)
-        specZgalaxies = allClusterGalaxies[specZthreshold]
-        # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
-        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= offset*0.08*(1+allClusterGalaxies['zphot'].values)
-        photZgalaxies = allClusterGalaxies[photZthreshold]
-        # Remove photZgalaxies with a specZ
-        photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
+        if mcnab == 2:
+            # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
+            specZgalaxies = pd.DataFrame()
+            photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.16
+            photZgalaxies = allClusterGalaxies[photZthreshold]
+        else:
+            specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) <= 0.02*(1+allClusterGalaxies['zspec'].values)
+            specZgalaxies = allClusterGalaxies[specZthreshold]
+            # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
+            photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.08*(1+allClusterGalaxies['zphot'].values)
+            photZgalaxies = allClusterGalaxies[photZthreshold]
+            # Remove photZgalaxies with a specZ
+            photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
         # Combine into a single DataFrame
         memberGalaxies = specZgalaxies.append(photZgalaxies)
         return memberGalaxies
@@ -366,7 +372,7 @@ class GOGREEN:
             self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1').shape[0], 
-            self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
+            self.catalog.query('member == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
         print(table)
         # Extract desired quantities from data
         passiveMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar <= 1.6e10')
@@ -434,19 +440,19 @@ class GOGREEN:
         :return   :    values are set in the catalog
         """
         self.catalog['re_err_robust'] = np.nan
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re < 0.3), 0.01, self.catalog.re_err_robust) #https://stackoverflow.com/questions/12307099/modifying-a-subset-of-rows-in-a-pandas-dataframe
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 21) & (self.catalog.re > 0.3), 0.01, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re < 0.3), 0.02, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), 0.02, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re < 0.3), 0.03, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re > 0.3), 0.06, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re < 0.3), 0.08, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re > 0.3), 0.15, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re < 0.3), 0.18, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re > 0.3), 0.33, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), 0.42, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), 0.63, self.catalog.re_err_robust)
-        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), 0.76, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) <= 21) & (self.catalog.re < 0.3), self.catalog.re*0.01, self.catalog.re_err_robust) #https://stackoverflow.com/questions/12307099/modifying-a-subset-of-rows-in-a-pandas-dataframe
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) <= 21) & (self.catalog.re > 0.3), self.catalog.re*0.01, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re < 0.3), self.catalog.re*0.02, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), self.catalog.re*0.02, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re < 0.3), self.catalog.re*0.03, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re > 0.3), self.catalog.re*0.06, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re < 0.3), self.catalog.re*0.08, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re > 0.3), self.catalog.re*0.15, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re < 0.3), self.catalog.re*0.18, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re > 0.3), self.catalog.re*0.33, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), self.catalog.re*0.42, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), self.catalog.re*0.63, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), self.catalog.re*0.76, self.catalog.re_err_robust)
     #END SETREERR
 
     def reConvert(self):
@@ -1164,6 +1170,8 @@ class GOGREEN:
                     bYmags = bData['mag'].values
                     aYres = aData['re'].values
                     bYres = bData['re'].values
+                    aYerrs = aData['re_err_robust'].values
+                    bYerrs = bData['re_err_robust'].values
                 print("===quiescent===")
                 for i in range(0, len(aXVals)):
                     mass = aXVals[i]
@@ -1175,7 +1183,9 @@ class GOGREEN:
                         plt.scatter(mass, size, alpha=0.5, color='black')
                         print("magnitude: " + str(aYmags[i]))
                         print("Re: " + str(aYres[i]))
-                        print("Err: " + str(aYsigmas[i]))
+                        print("Err: " + str(aYerrs[i]))
+                        print("Re Converted: " + str(size))
+                        print("Err converted: " + str(sigma))
                     else:
                         plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='red')
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='red')
@@ -1184,15 +1194,17 @@ class GOGREEN:
                     mass = bXVals[i]
                     size = bYVals[i]
                     sigma = bYsigmas[i]
-                    upperSigma = np.log10(size + sigma) - np.log10(size)
-                    lowerSigma = np.log10(size) - np.log10(size - sigma)
+                    upperSigma = np.log10(pow(10, size) + sigma) - np.log10(pow(10, size))
+                    lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
                         print("magnitude: " + str(bYmags[i]))
                         print("Re: " + str(bYres[i]))
-                        print("Err: " + str(bYsigmas[i]))
+                        print("Err: " + str(bYerrs[i]))
                         print("Upper nan: " + str(np.isnan(upperSigma)))
                         print("Lower nan: " + str(np.isnan(lowerSigma)))
+                        print("Re Converted: " + str(size))
+                        print("Err converted: " + str(sigma))
                     else:
                         plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='blue')
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
