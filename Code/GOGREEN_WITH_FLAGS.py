@@ -1166,13 +1166,6 @@ class GOGREEN:
                 elif yQuantityName == 're_converted':
                     aYsigmas = aData['re_err_robust_converted'].values
                     bYsigmas = bData['re_err_robust_converted'].values
-                    aYmags = aData['mag'].values
-                    bYmags = bData['mag'].values
-                    aYres = aData['re'].values
-                    bYres = bData['re'].values
-                    aYerrs = aData['re_err_robust'].values
-                    bYerrs = bData['re_err_robust'].values
-                print("===quiescent===")
                 for i in range(0, len(aXVals)):
                     mass = aXVals[i]
                     size = aYVals[i]
@@ -1181,15 +1174,9 @@ class GOGREEN:
                     lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
-                        print("magnitude: " + str(aYmags[i]))
-                        print("Re: " + str(aYres[i]))
-                        print("Err: " + str(aYerrs[i]))
-                        print("Re Converted: " + str(size))
-                        print("Err converted: " + str(sigma))
                     else:
                         plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='red')
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='red')
-                print("===star-forming===")
                 for i in range(0, len(bXVals)):
                     mass = bXVals[i]
                     size = bYVals[i]
@@ -1198,13 +1185,6 @@ class GOGREEN:
                     lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
-                        print("magnitude: " + str(bYmags[i]))
-                        print("Re: " + str(bYres[i]))
-                        print("Err: " + str(bYerrs[i]))
-                        print("Upper nan: " + str(np.isnan(upperSigma)))
-                        print("Lower nan: " + str(np.isnan(lowerSigma)))
-                        print("Re Converted: " + str(size))
-                        print("Err converted: " + str(sigma))
                     else:
                         plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='blue')
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
