@@ -353,7 +353,15 @@ class GOGREEN:
 
         :return    :     plots are plotted
         """
-        # Reduce according to standard criteria (should be set up to match McNab+21 requirements. See "main" notebook for more information)
+        # Establish appropriate standard criteria
+        searchCriteria = [
+            'Star == 0',
+            'K_flag < 4',
+            'Mstellar > 3.2e9',
+            '1 < zphot < 1.5',
+        ]
+        self.standardCriteria = searchCriteria
+        # Set data quality flags according to standard criteria
         self.reduceDF(None, True)
         print("Total: " + str(self.catalog.query('goodData == 1').shape[0]))
         print("Total members: " + str(self.catalog.query('member_adjusted == 1 and goodData == 1').shape[0]))
@@ -369,7 +377,7 @@ class GOGREEN:
             self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1').shape[0], 
-            self.catalog.query('member == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
+            self.catalog.query('member == 1 and (Redshift_Quality == 3 or Redshift_Quality == 4) and goodData == 1 and postStarBurst == 1').shape[0]]
         # Display table
         print(table)
         # Extract desired quantities from data for plot
@@ -378,13 +386,13 @@ class GOGREEN:
         starFormingMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar <= 1.6e10')
         greenValleyMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar <= 1.6e10')
         blueQuiescentMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar <= 1.6e10')
-        postStarBurstMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar <= 1.6e10')
+        postStarBurstMembersBad = self.catalog.query('member == 1 and (Redshift_Quality == 3 or Redshift_Quality == 4) and goodData == 1 and postStarBurst == 1 and Mstellar <= 1.6e10')
 
         passiveMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar > 1.6e10')
         starFormingMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar > 1.6e10')
         greenValleyMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar > 1.6e10')
         blueQuiescentMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar > 1.6e10')
-        postStarBurstMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar > 1.6e10')
+        postStarBurstMembersGood = self.catalog.query('member == 1 and (Redshift_Quality == 3 or Redshift_Quality == 4) and goodData == 1 and postStarBurst == 1 and Mstellar > 1.6e10')
 
         # Construct plot 1
         plt.figure()
