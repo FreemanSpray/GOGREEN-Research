@@ -578,7 +578,7 @@ class GOGREEN:
         #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, sigma=errs)
         guessVals = [slope, intercept]
         # Calculate coefficients using line-fitting algorithm
-        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=guessVals, bounds=([-10, -10], [10, 10]), loss="huber")
+        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, p0=guessVals, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber")
         slope = s[0]
         intercept = s[1]
         if row != None and col != None:
@@ -655,16 +655,14 @@ class GOGREEN:
                 try:
                     # Calculate coefficients for a bootstrap line
                     #s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
-                    #s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
-                    s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, bounds=([-10, -10], [10, 10]), loss="huber")
+                    s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, p0=guessVals, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
                     m = s[0]
                     b = s[1]
                     # Store coefficients
                     intercepts[i] = b
                     slopes[i] = m
-                    # Calculate outputs
-                    xline = np.array([xMin, xMax])
                     # Uncomment to plot each bootstrap line.
+                    #xline = np.array([xMin, xMax])
                     #yline = b + m*xline
                     #plot.plot(xline, yline, color='green', alpha=0.6)
                     plotted = True
