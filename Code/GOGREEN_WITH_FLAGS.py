@@ -115,6 +115,8 @@ class GOGREEN:
         # Generate fractional error columns
         self.catalog['re_frac_err'] = self.catalog['re_err_robust']/self.catalog['re']
         self.catalog['re_frac_err_converted'] = self.catalog['re_err_robust_converted']/self.catalog['re_converted']
+        # Generate cluster-centric distance columns
+        self.calcClusterCentricDist()
 
     # END INIT
 
@@ -475,6 +477,15 @@ class GOGREEN:
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), self.catalog.re*0.63, self.catalog.re_err_robust)
         self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), self.catalog.re*0.76, self.catalog.re_err_robust)
     #END SETREERR
+
+    def calcClusterCentricDist(self):
+        """
+        Assign cluster-centric distance values for all member galaxies
+
+        :return   :    Catalog is updated
+        """
+        self.catalog['cluster_centric_distance'] = np.nan
+        self.catalog['cluster_centric_distance'] = np.where(self.catalog.member_adjusted == 1, self._clustersCatalog[self._clustersCatalog['cluster'] == self.catalog.cluster].RA_Best, self.catalog.cluster_centric_distance)
 
     def reConvert(self):
         """
