@@ -541,21 +541,25 @@ class GOGREEN:
         size = data['re_converted'].values
         mass = data['Mstellar'].values
         errs = data['re_err_robust_converted'].values
-        # Calculate coefficients (slope and y-intercept)
-        # Take log of data as needed
-        if useLog[0] == True:
-            mass = np.log10(mass)
-        if useLog[1] == True:
-            upperErrs = np.log10(size + errs) - np.log10(size)
-            lowerErrs = np.log10(size) - np.log10(size - errs)
-            size = np.log10(size)
-            errs = (upperErrs + lowerErrs)/2
-        # Convert back to fractional errors
-        errs = errs/size 
+        # Convert to fractional error
+        errs = errs/size
         # Calculate coefficients using line-fitting algorithm
-        s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=mass, ydata=size, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber") 
+        print("count")
+        print(mass.shape)
+        print("mass")
+        print(mass)
+        print("size")
+        print(size)
+        print("errs")
+        print(errs)
+        s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=mass, ydata=size, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber") 
         slope = s[0]
         intercept = s[1]
+        print("slope and intercept")
+        print(slope, intercept)
+        # Define x bounds
+        xBounds = np.array([9.8,11.5])
+        # Plot lines
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
@@ -564,18 +568,18 @@ class GOGREEN:
                     self.bootstrap(mass, size, errs, axes, row, col, lineColor=color)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
-                    axes[row][col].plot(mass, intercept + slope*mass, color='white', linewidth=4)
+                    axes[row][col].plot(xBounds, intercept + slope*xBounds, color='white', linewidth=4)
                 # Plot the best fit line
-                axes[row][col].plot(mass, intercept + slope*mass, color=color, label=lbl)
+                axes[row][col].plot(xBounds, intercept + slope*xBounds, color=color, label=lbl)
                 return
         if bootstrap:
             # Bootstrapping calculation
             self.bootstrap(mass, size, errs, axes, row, col, lineColor=color)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
-            plt.plot(mass, intercept + slope*mass, color='white', linewidth=4)
+            plt.plot(xBounds, intercept + slope*xBounds, color='white', linewidth=4)
         # Plot the best fit line
-        plt.plot(mass, intercept + slope*mass, color=color, label=lbl)
+        plt.plot(xBounds, intercept + slope*xBounds, color=color, label=lbl)
         return slope, intercept
     # END MSRFIT
 
@@ -610,8 +614,8 @@ class GOGREEN:
         rng = np.random.RandomState(1234567890) # reference: https://stackoverflow.com/questions/5836335/consistently-create-same-random-numpy-array
         # Initialize arrays
         size = len(x)
-        xMin = np.min(x)
-        xMax = np.max(x)
+        xMin = np.log10(np.min(x))
+        xMax = np.log10(np.max(x))
         slopes = np.empty((100,))
         intercepts = np.empty((100,))
         # Create 100 bootstrap lines
@@ -627,7 +631,7 @@ class GOGREEN:
                 # Fit data with equation (in try-catch block to help detect errors)
                 try:
                     # Calculate coefficients for a bootstrap line
-                    s, _ = opt.curve_fit(f=lambda x, m, b: m*x + b, xdata=bootstrapX, ydata=bootstrapY, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
+                    s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=bootstrapX, ydata=bootstrapY, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
                     m = s[0]
                     b = s[1]
                     # Store coefficients
@@ -1160,6 +1164,22 @@ class GOGREEN:
                 else:
                     #print(aData.shape)
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
+            print("count Q")
+            print(aXVals.shape)
+            print("mass Q")
+            print(pow(10, aXVals))
+            print("size Q")
+            print(pow(10, aYVals))
+            print("errs Q")
+            print(aData["re_frac_err_converted"].values)
+            print("count SF")
+            print(bXVals.shape)
+            print("mass SF")
+            print(pow(10, bXVals))
+            print("size SF")
+            print(pow(10, bYVals))
+            print("errs SF")
+            print(bData["re_frac_err_converted"].values)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if plotErrBars:
