@@ -484,8 +484,34 @@ class GOGREEN:
 
         :return   :    Catalog is updated
         """
+        # Initialize to NaN
+        self.catalog['cluster_RA'] = np.nan
+        self.catalog['cluster_DEC'] = np.nan
         self.catalog['cluster_centric_distance'] = np.nan
-        self.catalog['cluster_centric_distance'] = np.where(self.catalog.member_adjusted == 1, self._clustersCatalog[self._clustersCatalog['cluster'] == self.catalog.cluster].RA_Best, self.catalog.cluster_centric_distance)
+        # Assign cluster RA and DEC values
+        structClusters = ['SpARCS0219', 'SpARCS0035','SpARCS1634', 'SpARCS1616', 'SPT0546', 'SpARCS1638',
+                                    'SPT0205', 'SPT2106', 'SpARCS1051', 'SpARCS0335', 'SpARCS1034']
+        cluster_RAs = []
+        cluster_DECs = []
+        for clusterName in structClusters:
+            cluster_RAs.append(float(self._clustersCatalog[self._clustersCatalog['cluster'] == clusterName].RA_Best))
+            cluster_DECs.append(float(self._clustersCatalog[self._clustersCatalog['cluster'] == clusterName].DEC_Best))
+        # Fill in cluster RA and DEC columns in catalog for ease of access
+        for i in range(0, len(structClusters)):
+            self.catalog['cluster_RA'] = np.where(self.catalog.cluster == structClusters[i], cluster_RAs[i], self.catalog.cluster_RA)
+            self.catalog['cluster_DEC'] = np.where(self.catalog.cluster == structClusters[i], cluster_DECs[i], self.catalog.cluster_DEC)
+        print(self.catalog['cluster_RA'])
+        # Calculate cluster-centric distance for each member and fill in column
+        self.catalog['cluster_centric_distance'] = np.where(self.catalog.member_adjusted == 1, self.ccd(self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_RA, self.catalog.cluster_DEC), self.catalog.cluster_centric_distance)
+
+        """
+        ccd Helper function called by calcClusterCentricDist()
+
+        :return   :    ...
+        """
+    def ccd(self, gal_RA, gal_Dec, clust_RA, clust_DEC):
+        pass
+                                            
 
     def reConvert(self):
         """
