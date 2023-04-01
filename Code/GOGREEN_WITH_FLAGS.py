@@ -106,6 +106,8 @@ class GOGREEN:
         self.catalog = self.merge(self._combinedSourceCatalog, self._matchedCatalog, 'cPHOTID')
         # readjust to preserve NaN values after merge
         self.catalog = self.catalog.replace(100000000000000000000, np.nan)
+        # Generate cluster-centric distance columns
+        self.calcClusterCentricDist()
         # Generate flags for use in plotting
         self.generateFlags()
         # Set error values (necessary because the re_err values from Galfit are not adequate)
@@ -115,8 +117,6 @@ class GOGREEN:
         # Generate fractional error columns
         self.catalog['re_frac_err'] = self.catalog['re_err_robust']/self.catalog['re']
         self.catalog['re_frac_err_converted'] = self.catalog['re_err_robust_converted']/self.catalog['re_converted']
-        # Generate cluster-centric distance columns
-        self.calcClusterCentricDist()
 
     # END INIT
 
@@ -228,7 +228,8 @@ class GOGREEN:
             specZgalaxies = pd.DataFrame()
             # Photometric criteria: (zphot-zclust) < 0.16
             photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.16
-            photZgalaxies = allClusterGalaxies[photZthreshold]
+            radiusThreshold = allClusterGalaxies['cluster_centric_distance'] < 1000
+            photZgalaxies = allClusterGalaxies[photZthreshold & radiusThreshold]
         else:
             # Find spectroscopic and photometric members seperately
             # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
@@ -399,17 +400,17 @@ class GOGREEN:
         # Construct plot 1
         plt.figure()
         # Plot "bad" data
-        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=15, marker='o', color='red')
-        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['NUVMINV'], alpha=0.5, s=15, marker='*',  color='blue')
-        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['NUVMINV'], alpha=0.5, s=15, marker='d', color='green')
-        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['NUVMINV'], alpha=0.5, s=15, marker='s', color='orange')
-        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['NUVMINV'], alpha=0.5, s=15, marker='x', color='purple')
+        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=8, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['NUVMINV'], alpha=0.5, s=8, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['NUVMINV'], alpha=0.5, s=8, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['NUVMINV'], alpha=0.5, s=8, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['NUVMINV'], alpha=0.5, s=8, marker='x', color='purple')
         # Plot "good" data
-        plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['NUVMINV'], alpha=0.5, s=60, marker='o', color='red')
-        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['NUVMINV'], alpha=0.5, s=60, marker='*',  color='blue')
-        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=60, marker='d', color='green')
-        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
-        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSB')
+        plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['NUVMINV'], alpha=0.5, s=30, marker='o', color='red')
+        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['NUVMINV'], alpha=0.5, s=30, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=30, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=30, marker='s', color='orange', label='BQ')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=30, marker='x', color='purple', label='PSB')
         # Indicate the green valley region
         plt.plot([0.2, 2], [2, 5.5], linestyle='dashed', color='black')
         plt.plot([0.2, 2], [1.5, 5], linestyle='dashed', color='black')
@@ -424,17 +425,17 @@ class GOGREEN:
         # Construct plot 2
         plt.figure()
         # Plot "bad" data
-        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['UMINV'], alpha=0.5, s=15, marker='o', color='red')
-        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['UMINV'], alpha=0.5, s=15, marker='*',  color='blue')
-        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['UMINV'], alpha=0.5, s=15, marker='d', color='green')
-        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=15, marker='s', color='orange')
-        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=15, marker='x', color='purple')
+        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['UMINV'], alpha=0.5, s=8, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['UMINV'], alpha=0.5, s=8, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['UMINV'], alpha=0.5, s=8, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=8, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=8, marker='x', color='purple')
         # Plot "good" data
         plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['UMINV'], alpha=0.5, s=30, marker='o', color='red', label='Q')
-        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['UMINV'], alpha=0.5, s=60, marker='*',  color='blue', label='SF')
-        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['UMINV'], alpha=0.5, s=60, marker='d', color='green', label='GV')
-        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=60, marker='s', color='orange')
-        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=60, marker='x', color='purple')
+        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['UMINV'], alpha=0.5, s=30, marker='*',  color='blue', label='SF')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['UMINV'], alpha=0.5, s=30, marker='d', color='green', label='GV')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=30, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=30, marker='x', color='purple')
         #xPoints = [0.3, 0.6, 0.7, 1]
         #yPoints = [1.65, 1.95, 1.2, 1.45]
         # Indicate the blue quiescent region
@@ -498,7 +499,7 @@ class GOGREEN:
         for i in range(0, len(structClusters)):
             self.catalog['cluster_z'] = np.where(self.catalog.cluster == structClusters[i], cluster_Redshifts[i], self.catalog.cluster_z)
         # Calculate cluster-centric distance for each member and fill in column
-        self.catalog['cluster_centric_distance'] = self.ccd(self.catalog.ra, self.catalog.dec, self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z, self.catalog.member_adjusted)
+        self.catalog['cluster_centric_distance'] = self.ccd(self.catalog.ra, self.catalog.dec, self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z)
 
         """
         ccd Helper function called by calcClusterCentricDist()
@@ -513,7 +514,7 @@ class GOGREEN:
                                 Value: 0 - indicates false
         :return         :      Cluster-centric distance of each galaxy (in kpc)
         """
-    def ccd(self, gal_RA, gal_DEC, clust_RA, clust_DEC, clust_z, is_member):
+    def ccd(self, gal_RA, gal_DEC, clust_RA, clust_DEC, clust_z):
         # Convert cluster dec to radians
         clust_DEC_rad = clust_DEC * np.pi / 180
         # Calculate cluster-centric distance in degrees
@@ -523,10 +524,9 @@ class GOGREEN:
         # Convert to kpc
         ccd_arcmin_sq_vals = ccd_arcmin_sq.values
         clust_z_vals = clust_z.values
-        is_member_vals = is_member.values
         ccd_kpc_sq_vals = []
         for i in range(0, len(ccd_arcmin_sq_vals)):
-            if clust_z_vals[i] >= 0 and is_member_vals[i] == 1: # We avoid inputting NaN values to the conversion function
+            if clust_z_vals[i] >= 0: # We avoid inputting NaN values to the conversion function
                 ccd_kpc_sq_vals.append(pow(np.sqrt(ccd_arcmin_sq_vals[i])*cosmo.kpc_proper_per_arcmin(clust_z_vals[i]), 2)) # Have to input single values to the conversion function
                 # Remove units
                 ccd_kpc_sq_vals[i] = (ccd_kpc_sq_vals[i] / u.kpc) / u.kpc * u.arcmin * u.arcmin
