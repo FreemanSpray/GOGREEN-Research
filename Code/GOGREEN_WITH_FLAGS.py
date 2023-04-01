@@ -485,32 +485,56 @@ class GOGREEN:
         :return   :    Catalog is updated
         """
         # Initialize to NaN
-        self.catalog['cluster_RA'] = np.nan
-        self.catalog['cluster_DEC'] = np.nan
+        self.catalog['cluster_z'] = np.nan
         self.catalog['cluster_centric_distance'] = np.nan
         # Assign cluster RA and DEC values
         structClusters = ['SpARCS0219', 'SpARCS0035','SpARCS1634', 'SpARCS1616', 'SPT0546', 'SpARCS1638',
                                     'SPT0205', 'SPT2106', 'SpARCS1051', 'SpARCS0335', 'SpARCS1034']
-        cluster_RAs = []
-        cluster_DECs = []
+        cluster_Redshifts = []
+        # Add in cluster redshifts
         for clusterName in structClusters:
-            cluster_RAs.append(float(self._clustersCatalog[self._clustersCatalog['cluster'] == clusterName].RA_Best))
-            cluster_DECs.append(float(self._clustersCatalog[self._clustersCatalog['cluster'] == clusterName].DEC_Best))
+            cluster_Redshifts.append(float(self._clustersCatalog[self._clustersCatalog['cluster'] == clusterName].Redshift))
         # Fill in cluster RA and DEC columns in catalog for ease of access
         for i in range(0, len(structClusters)):
-            self.catalog['cluster_RA'] = np.where(self.catalog.cluster == structClusters[i], cluster_RAs[i], self.catalog.cluster_RA)
-            self.catalog['cluster_DEC'] = np.where(self.catalog.cluster == structClusters[i], cluster_DECs[i], self.catalog.cluster_DEC)
-        print(self.catalog['cluster_RA'])
+            self.catalog['cluster_z'] = np.where(self.catalog.cluster == structClusters[i], cluster_Redshifts[i], self.catalog.cluster_z)
         # Calculate cluster-centric distance for each member and fill in column
-        self.catalog['cluster_centric_distance'] = np.where(self.catalog.member_adjusted == 1, self.ccd(self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_RA, self.catalog.cluster_DEC), self.catalog.cluster_centric_distance)
+        self.catalog['cluster_centric_distance'] = self.ccd(self.catalog.ra, self.catalog.dec, self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z, self.catalog.member_adjusted)
 
         """
         ccd Helper function called by calcClusterCentricDist()
 
-        :return   :    ...
+        :param gal_RA   :      Right ascension of each galaxy (in degrees)
+        :param clust_RA :      Right ascension of each galaxy's cluster (in degrees)
+        :param gal_DEC  :      Declination of each galaxy (in degrees)
+        :param clust_DEC:      Declination of each galaxy's cluster (in degrees)
+        :param clust_z  :      Redshift of each galaxy's cluster (z)
+        :param is_member:      Flag indicating whether the galaxy is a member of the cluster associated with it.
+                                Value: 1 - indicates true
+                                Value: 0 - indicates false
+        :return         :      Cluster-centric distance of each galaxy (in kpc)
         """
-    def ccd(self, gal_RA, gal_Dec, clust_RA, clust_DEC):
-        pass
+    def ccd(self, gal_RA, gal_DEC, clust_RA, clust_DEC, clust_z, is_member):
+        # Convert cluster dec to radians
+        clust_DEC_rad = clust_DEC * np.pi / 180
+        # Calculate cluster-centric distance in degrees
+        ccd_deg_sq = pow((gal_RA - clust_RA)*np.cos(clust_DEC_rad), 2) + pow(gal_DEC - clust_DEC, 2)
+        # Convert to arcmin
+        ccd_arcmin_sq = pow(np.sqrt(ccd_deg_sq)*60, 2)
+        # Convert to kpc
+        ccd_arcmin_sq_vals = ccd_arcmin_sq.values
+        clust_z_vals = clust_z.values
+        is_member_vals = is_member.values
+        ccd_kpc_sq_vals = []
+        for i in range(0, len(ccd_arcmin_sq_vals)):
+            if clust_z_vals[i] >= 0 and is_member_vals[i] == 1: # We avoid inputting NaN values to the conversion function
+                ccd_kpc_sq_vals.append(pow(np.sqrt(ccd_arcmin_sq_vals[i])*cosmo.kpc_proper_per_arcmin(clust_z_vals[i]), 2)) # Have to input single values to the conversion function
+                # Remove units
+                ccd_kpc_sq_vals[i] = (ccd_kpc_sq_vals[i] / u.kpc) / u.kpc * u.arcmin * u.arcmin
+            else:
+                ccd_kpc_sq_vals.append(np.NaN)
+        # Unsquare
+        ccd_kpc_vals = np.sqrt(ccd_kpc_sq_vals)
+        return ccd_kpc_vals
                                             
 
     def reConvert(self):
