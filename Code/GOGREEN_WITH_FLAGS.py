@@ -403,14 +403,14 @@ class GOGREEN:
         plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=8, marker='o', color='red')
         plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['NUVMINV'], alpha=0.5, s=8, marker='*',  color='blue')
         plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['NUVMINV'], alpha=0.5, s=8, marker='d', color='green')
-        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['NUVMINV'], alpha=0.5, s=8, marker='s', color='orange')
-        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['NUVMINV'], alpha=0.5, s=8, marker='x', color='purple')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['NUVMINV'], alpha=0.5, s=30, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['NUVMINV'], alpha=0.5, s=30, marker='x', color='purple')
         # Plot "good" data
         plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['NUVMINV'], alpha=0.5, s=30, marker='o', color='red')
         plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['NUVMINV'], alpha=0.5, s=30, marker='*',  color='blue')
         plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=30, marker='d', color='green')
-        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=30, marker='s', color='orange', label='BQ')
-        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=30, marker='x', color='purple', label='PSB')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSB')
         # Indicate the green valley region
         plt.plot([0.2, 2], [2, 5.5], linestyle='dashed', color='black')
         plt.plot([0.2, 2], [1.5, 5], linestyle='dashed', color='black')
@@ -427,15 +427,15 @@ class GOGREEN:
         # Plot "bad" data
         plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['UMINV'], alpha=0.5, s=8, marker='o', color='red')
         plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['UMINV'], alpha=0.5, s=8, marker='*',  color='blue')
-        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['UMINV'], alpha=0.5, s=8, marker='d', color='green')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['UMINV'], alpha=0.5, s=30, marker='d', color='green')
         plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=8, marker='s', color='orange')
-        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=8, marker='x', color='purple')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=30, marker='x', color='purple')
         # Plot "good" data
         plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['UMINV'], alpha=0.5, s=30, marker='o', color='red', label='Q')
         plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['UMINV'], alpha=0.5, s=30, marker='*',  color='blue', label='SF')
-        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['UMINV'], alpha=0.5, s=30, marker='d', color='green', label='GV')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['UMINV'], alpha=0.5, s=60, marker='d', color='green', label='GV')
         plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=30, marker='s', color='orange')
-        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=30, marker='x', color='purple')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=60, marker='x', color='purple')
         #xPoints = [0.3, 0.6, 0.7, 1]
         #yPoints = [1.65, 1.95, 1.2, 1.45]
         # Indicate the blue quiescent region
@@ -739,6 +739,17 @@ class GOGREEN:
         # Fill in region
         plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
+
+    def evalLineFit():
+        # y = 1.213x - 2.44
+        m = 1.213
+        b = -2.44
+        rng = np.random.RandomState(1234567890)
+        randXLine = 9.8 + rng.random()*2.7
+        yLine = m*x + b
+        randUnc = rng.random()/2
+    # END EVALLINEFIT
+        
 
     def getRatio(self, x:float=None, y:float=None, bootstrap:bool=True, limitRange:bool=True, useTransition:bool=False) -> list:
         """
@@ -1122,7 +1133,7 @@ class GOGREEN:
     # END TEST
     
     def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, colorType:str=None, useLog:list=[False,False], fitLine:bool=False,
-        data:pd.DataFrame=None, color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, bootstrap:bool=True, plotErrBars:bool=False,):
+        data:pd.DataFrame=None, color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
             """
             Helper function called by plot(). Handles the plotting of data.
                 
@@ -1158,6 +1169,11 @@ class GOGREEN:
                                         Default: True
             :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted
                                         Default: False
+            :param plotTransitionType  Flag to indicate whether individual galaxies should have their Re error plotted
+                                        Default: None
+                                        Value: GV - plot green valley trend
+                                        Value: BQ - plot blue quiescent trend    
+                                        Value: PSB - plot post-starburst trend   
             :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points. Generated plot is displayed.
             """
             # Arbitrary establishment of variables for non-coloring case
@@ -1202,6 +1218,15 @@ class GOGREEN:
             else:
                 print(colorType, ' is not a valid coloring scheme!')
                 return
+            if plotTransitionType == 'GV':
+                cData = data.query('greenValley == 1 and goodData == 1')
+                cLbl = 'Green Valley'
+            elif colorType == 'BQ':
+                cData = data.query('blueQuiescent == 1 and goodData == 1')
+                cLbl = 'Blue Quiescent'
+            elif colorType == 'PSB': 
+                cData = data.query('postStarBurst == 1 and goodData == 1')
+                cLbl = 'Post-starburst'
             aXVals = aData[xQuantityName].values
             bXVals = bData[xQuantityName].values
             aYVals = aData[yQuantityName].values
@@ -1292,7 +1317,7 @@ class GOGREEN:
 
 
     def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None, colors:list=None, 
-        useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, bootstrap:bool=True, plotErrBars:bool=False):
+        useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -1339,6 +1364,11 @@ class GOGREEN:
                                     Default: True
         :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted
                                     Default: False
+        :param plotTransitionType  Flag to indicate whether individual galaxies should have their Re error plotted
+                                    Default: None
+                                    Value: GV - plot green valley trend
+                                    Value: BQ - plot blue quiescent trend    
+                                    Value: PSB - plot post-starburst trend                     
         :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points. Generated plot is displayed.
         """
         # Initialize plot
@@ -1378,7 +1408,7 @@ class GOGREEN:
                 print(useMembers, " is not a valid membership requirement!")
                 return
             # Plot data
-            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars)
+            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
         # Plot all clusters individually in a subplot
         elif plotType == 2:
             # Initialize data count totals (used when running test suite)
@@ -1410,7 +1440,7 @@ class GOGREEN:
                         print(useMembers, " is not a valid membership requirement!")
                         return
                     # Plot data
-                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars)
+                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
                     # Update data count totals
                     xTot+=x
                     yTot+=y
@@ -1451,7 +1481,7 @@ class GOGREEN:
                 else:
                     print(useMembers, " is not a valid membership requirement!")
                     return
-            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars)
+            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
         else:
             print(plotType, " is not a valid plotting scheme!")
             return
