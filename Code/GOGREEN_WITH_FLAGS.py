@@ -740,14 +740,22 @@ class GOGREEN:
         plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
-    def evalLineFit():
+    def evalLineFit(self):
         # y = 1.213x - 2.44
         m = 1.213
         b = -2.44
         rng = np.random.RandomState(1234567890)
         randXLine = 9.8 + rng.random()*2.7
-        yLine = m*x + b
+        yLine = m*randXLine + b
         randUnc = rng.random()/2
+        nFake = []
+        for i in range(0, 100):
+            yFake = rng.normal(loc=yLine, scale=randUnc)
+            nFake.append((randXLine, yFake, yFake*randUnc))
+        s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=nFake[0], ydata=nFake[1], sigma=nFake[2], bounds=([-10, -10], [10, 10]), loss="huber") 
+        slope = s[0]
+        intercept = s[1]
+        print((slope, intercept))
     # END EVALLINEFIT
         
 
