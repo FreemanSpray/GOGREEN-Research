@@ -110,6 +110,8 @@ class GOGREEN:
         self.calcClusterCentricDist()
         # Generate flags for use in plotting
         self.generateFlags()
+        # Establish membership
+        self.getMembers()
         # Set error values (necessary because the re_err values from Galfit are not adequate)
         self.setReErr()
         # Generate converted unit columns (kpc instead of arcsec) for re values.
@@ -156,11 +158,6 @@ class GOGREEN:
         self.catalog['elliptical'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
         reduced = self.catalog.query(spiralQuery)
         self.catalog['spiral'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-        # Membership flag (our own definition, as opposed to the "member" flag already included)
-        self.catalog['member_adjusted'] = 0
-        for clusterName in self._structClusterNames:
-            reduced = self.getMembers(clusterName, 2)
-            self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int) + self.catalog['member_adjusted'] 
     # END GENERATEFLAGS
 
     def generateDF(self, filePath:str) -> pd.DataFrame:
@@ -211,38 +208,24 @@ class GOGREEN:
         return targetCluster['Redshift'].values[0]
     # END GETCLUSTERZ
 
-    def getMembers(self, clusterName:str, mcnab:bool=False) -> pd.DataFrame:
+    def getMembers(self) -> pd.DataFrame:
         """
-        getMembers Gets the member galaxies of a cluster based on the galaxy redshift with respect to the
-                   best estimate of the cluster redshift.
+        getMembers Sets membership flag in the catalog based on criteria in McNab et. al. 2021
 
-        :param clusterName: Name of the cluster whose members should be returned
-        :param mcnab: Indicates whether membership criteria from McNab et. al. 2021 should be used
-        :return:            Pandas DataFrame containing the galaxies whose redshift match the membership requirements
+        :return:            catalog is updated
         """
-        clusterZ = self.getClusterZ(clusterName)
-        allClusterGalaxies = self.getClusterGalaxies(clusterName)
-        # If using McNab+21 criteria, only photometric sources are considered.
-        if mcnab:
-            # No spec galaxies included, so we initialize to empty DF.
-            specZgalaxies = pd.DataFrame()
-            # Photometric criteria: (zphot-zclust) < 0.16
-            photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.16
-            radiusThreshold = allClusterGalaxies['cluster_centric_distance'] < 1000
-            photZgalaxies = allClusterGalaxies[photZthreshold & radiusThreshold]
-        else:
-            # Find spectroscopic and photometric members seperately
-            # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
-            specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) <= 0.02*(1+allClusterGalaxies['zspec'].values)
-            specZgalaxies = allClusterGalaxies[specZthreshold]
-            # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
-            photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) <= 0.08*(1+allClusterGalaxies['zphot'].values)
-            photZgalaxies = allClusterGalaxies[photZthreshold]
-            # Remove photZgalaxies with a specZ
-            photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
-        # Combine photZ and specZ galaxies into a single DataFrame
-        memberGalaxies = specZgalaxies.append(photZgalaxies)
-        return memberGalaxies
+        # Intialize column
+        self.catalog['member_adjusted'] = 0
+        # McNab+21 criteria: (zq_spec>=3) & (member==1) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)<0.16)
+        specZthreshold = ((self.catalog['Redshift_Quality'] >= 3) & (self.catalog['member'] == 1))
+        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) < 0.16)
+        radiusThreshold = (self.catalog['cluster_centric_distance'] < 1000)
+        specZunderThreshold = ((self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0))
+        # Establish reduced dataset of members
+        reduced = self.catalog[(specZthreshold | ( specZunderThreshold & photZthreshold )) & radiusThreshold]
+        # Update catalog
+        self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        
     # END GETMEMBERS
 
     def getNonMembers(self, clusterName:str) -> pd.DataFrame:
@@ -361,13 +344,13 @@ class GOGREEN:
             'Star == 0',
             'K_flag < 4',
             'Mstellar > 3.2e9',
-            '1 < zphot < 1.5',
+            '(1 < zspec < 1.5) or (((Redshift_Quality < 3) or (SPECID < 0)) and (1 < zphot < 1.5))'
         ]
         self.standardCriteria = searchCriteria
         # Set data quality flags according to standard criteria
         self.reduceDF(None, True)
-        print("Total: " + str(self.catalog.query('goodData == 1').shape[0]))
-        print("Total members: " + str(self.catalog.query('member_adjusted == 1 and goodData == 1').shape[0]))
+        print("Total spec sample: " + str(self.catalog.query('zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]))
+        print("Total spec sample (above mass limit): " + str(self.catalog.query('zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]))
         # Construct table
         table = pd.DataFrame()
         table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
@@ -518,22 +501,21 @@ class GOGREEN:
         # Convert cluster dec to radians
         clust_DEC_rad = clust_DEC * np.pi / 180
         # Calculate cluster-centric distance in degrees
-        ccd_deg_sq = pow((gal_RA - clust_RA)*np.cos(clust_DEC_rad), 2) + pow(gal_DEC - clust_DEC, 2)
+        ccd_deg = np.sqrt(pow((gal_RA - clust_RA)*np.cos(clust_DEC_rad), 2) + pow(gal_DEC - clust_DEC, 2))
         # Convert to arcmin
-        ccd_arcmin_sq = pow(np.sqrt(ccd_deg_sq)*60, 2)
+        ccd_arcmin = ccd_deg*60
         # Convert to kpc
-        ccd_arcmin_sq_vals = ccd_arcmin_sq.values
+        ccd_arcmin_vals = ccd_arcmin.values
         clust_z_vals = clust_z.values
-        ccd_kpc_sq_vals = []
-        for i in range(0, len(ccd_arcmin_sq_vals)):
+        ccd_kpc_vals = []
+        for i in range(0, len(ccd_arcmin_vals)):
             if clust_z_vals[i] >= 0: # We avoid inputting NaN values to the conversion function
-                ccd_kpc_sq_vals.append(pow(np.sqrt(ccd_arcmin_sq_vals[i])*cosmo.kpc_proper_per_arcmin(clust_z_vals[i]), 2)) # Have to input single values to the conversion function
+                ccd_kpc_vals.append(ccd_arcmin_vals[i]*cosmo.kpc_proper_per_arcmin(clust_z_vals[i])) # Have to input single values to the conversion function
                 # Remove units
-                ccd_kpc_sq_vals[i] = (ccd_kpc_sq_vals[i] / u.kpc) / u.kpc * u.arcmin * u.arcmin
+                ccd_kpc_vals[i] = (ccd_kpc_vals[i] / u.kpc) * u.arcmin
             else:
-                ccd_kpc_sq_vals.append(np.NaN)
+                ccd_kpc_vals.append(np.NaN)
         # Unsquare
-        ccd_kpc_vals = np.sqrt(ccd_kpc_sq_vals)
         return ccd_kpc_vals
                                             
 
