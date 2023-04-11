@@ -112,6 +112,7 @@ class GOGREEN:
         self.generateFlags()
         # Establish membership
         self.getMembers()
+        self.getNonMembers()
         # Set error values (necessary because the re_err values from Galfit are not adequate)
         self.setReErr()
         # Generate converted unit columns (kpc instead of arcsec) for re values.
@@ -217,30 +218,31 @@ class GOGREEN:
         # Intialize column
         self.catalog['member_adjusted'] = 0
         # McNab+21 criteria: (zq_spec>=3) & (member==1) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)<0.16)
-        specZthreshold = ((self.catalog['Redshift_Quality'] >= 3) & (self.catalog['member'] == 1))
-        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) < 0.16)
-        radiusThreshold = (self.catalog['cluster_centric_distance'] < 1000)
-        specZunderThreshold = ((self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0))
+        specZthreshold = (self.catalog['Redshift_Quality'] >= 3) & (self.catalog['member'] == 1) & (self.catalog['cluster_centric_distance_spec'] < 1000)
+        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) < 0.16) & (self.catalog['cluster_centric_distance_phot'] < 1000)
+        specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
         # Establish reduced dataset of members
-        reduced = self.catalog[(specZthreshold | ( specZunderThreshold & photZthreshold )) & radiusThreshold]
+        reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
         # Update catalog
         self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-        
     # END GETMEMBERS
 
-    def getNonMembers(self, clusterName:str) -> pd.DataFrame:
+    def getNonMembers(self) -> pd.DataFrame:
         """
-        getNonMembers Gets the non-member galaxies (field galaxies in the line of sight of the cluster, either in front of or behind it) 
-                   of a cluster based on a call to getMembers().
+        getNonMembers Sets non-membership flag in the catalog based on criteria in McNab et. al. 2021
 
-        :param clusterName: Name of the cluster whose non-members should be returned
-        :return:            Pandas DataFrame containing the galaxies whose redshift do not match membership requirements
+        :return:            catalog is updated
         """
-        allClusterGalaxies = self.getClusterGalaxies(clusterName)
-        memberGalaxies = self.getMembers(clusterName)
-        # Non-members are found simply be excluding all members
-        nonMemberGalaxies = allClusterGalaxies[~allClusterGalaxies['cPHOTID'].isin(memberGalaxies['cPHOTID'])]
-        return nonMemberGalaxies
+        # Intialize column
+        self.catalog['nonmember_adjusted'] = 0
+        # McNab+21 criteria: ((zq_spec>=3) & (member==0) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)>=0.16))
+        specZthreshold = (self.catalog['Redshift_Quality'] >= 3) & ((self.catalog['member'] == 0) | (self.catalog['cluster_centric_distance_spec'] >= 1000))
+        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) >= 0.16) | (self.catalog['cluster_centric_distance_phot'] >= 1000)
+        specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
+        # Establish reduced dataset of members
+        reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        # Update catalog
+        self.catalog['nonmember_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
     # END GETNONMEMBERS
 
     def reduceDF(self, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
@@ -343,42 +345,44 @@ class GOGREEN:
         searchCriteria = [
             'Star == 0',
             'K_flag < 4',
-            'Mstellar > 3.2e9',
-            '(1 < zspec < 1.5) or (((Redshift_Quality < 3) or (SPECID < 0)) and (1 < zphot < 1.5))'
+            'Mstellar > 10**9.5',
+            '(1 < zspec < 1.5) or (((Redshift_Quality < 3) or (SPECID < 0)) and (1 < zphot < 1.5))',
+            'cluster_id <= 12'
         ]
         self.standardCriteria = searchCriteria
         # Set data quality flags according to standard criteria
         self.reduceDF(None, True)
-        print("Total spec sample: " + str(self.catalog.query('zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]))
-        print("Total spec sample (above mass limit): " + str(self.catalog.query('zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]))
+        print("Total phot sample: " + str(self.catalog.query('cluster_id <= 12 and zphot > 1 and zphot < 1.5 and K_flag >= 0 and K_flag < 4 and Star == 0 and Mstellar > 10**9.5').shape[0]))
+        print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]))
+        print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]))
         # Construct table
         table = pd.DataFrame()
         table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
-        table['Total Sample'] = [self.catalog.query('goodData == 1 and starForming == 1').shape[0], 
-            self.catalog.query('goodData == 1 and passive == 1').shape[0], 
-            self.catalog.query('goodData == 1 and greenValley == 1').shape[0], 
-            self.catalog.query('goodData == 1 and blueQuiescent == 1').shape[0], 
-            self.catalog.query('goodData == 1 and postStarBurst == 1').shape[0]]
+        table['Total Sample'] = [self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and starForming == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and passive == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and greenValley == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and blueQuiescent == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and postStarBurst == 1').shape[0]]
         table['Cluster Members'] = [self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1').shape[0], 
-            self.catalog.query('member == 1 and (Redshift_Quality == 3 or Redshift_Quality == 4) and goodData == 1 and postStarBurst == 1').shape[0]]
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
         # Display table
         print(table)
         # Extract desired quantities from data for plot
         # "Bad" populations refer to those before the spectroscopic mass threshold (to be displayed with smaller points)
-        passiveMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar <= 1.6e10')
-        starFormingMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar <= 1.6e10')
-        greenValleyMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar <= 1.6e10')
-        blueQuiescentMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar <= 1.6e10')
-        postStarBurstMembersBad = self.catalog.query('member == 1 and (Redshift_Quality == 3 or Redshift_Quality == 4) and goodData == 1 and postStarBurst == 1 and Mstellar <= 1.6e10')
+        passiveMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar <= 10**10.2')
+        starFormingMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar <= 10**10.2')
+        greenValleyMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar <= 10**10.2')
+        blueQuiescentMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar <= 10**10.2')
+        postStarBurstMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar <= 10**10.2')
 
-        passiveMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar > 1.6e10')
-        starFormingMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar > 1.6e10')
-        greenValleyMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar > 1.6e10')
-        blueQuiescentMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar > 1.6e10')
-        postStarBurstMembersGood = self.catalog.query('member == 1 and (Redshift_Quality == 3 or Redshift_Quality == 4) and goodData == 1 and postStarBurst == 1 and Mstellar > 1.6e10')
+        passiveMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar > 10**10.2')
+        starFormingMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar > 10**10.2')
+        greenValleyMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar > 10**10.2')
+        blueQuiescentMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar > 10**10.2')
+        postStarBurstMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar > 10**10.2')
 
         # Construct plot 1
         plt.figure()
@@ -470,7 +474,8 @@ class GOGREEN:
         """
         # Initialize to NaN
         self.catalog['cluster_z'] = np.nan
-        self.catalog['cluster_centric_distance'] = np.nan
+        self.catalog['cluster_centric_distance_phot'] = np.nan
+        self.catalog['cluster_centric_distance_spec'] = np.nan
         # Assign cluster RA and DEC values
         structClusters = ['SpARCS0219', 'SpARCS0035','SpARCS1634', 'SpARCS1616', 'SPT0546', 'SpARCS1638',
                                     'SPT0205', 'SPT2106', 'SpARCS1051', 'SpARCS0335', 'SpARCS1034']
@@ -482,7 +487,8 @@ class GOGREEN:
         for i in range(0, len(structClusters)):
             self.catalog['cluster_z'] = np.where(self.catalog.cluster == structClusters[i], cluster_Redshifts[i], self.catalog.cluster_z)
         # Calculate cluster-centric distance for each member and fill in column
-        self.catalog['cluster_centric_distance'] = self.ccd(self.catalog.ra, self.catalog.dec, self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z)
+        self.catalog['cluster_centric_distance_phot'] = self.ccd(self.catalog.ra, self.catalog.dec, self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z)
+        self.catalog['cluster_centric_distance_spec'] = self.ccd(self.catalog['RA(J2000)'].values, self.catalog['DEC(J2000)'], self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z)
 
         """
         ccd Helper function called by calcClusterCentricDist()
