@@ -352,9 +352,9 @@ class GOGREEN:
         self.standardCriteria = searchCriteria
         # Set data quality flags according to standard criteria
         self.reduceDF(None, True)
-        print("Total phot sample: " + str(self.catalog.query('cluster_id <= 12 and zphot > 1 and zphot < 1.5 and K_flag >= 0 and K_flag < 4 and Star == 0 and Mstellar > 10**9.5').shape[0]))
-        print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]))
-        print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]))
+        print("Total phot sample: " + str(self.catalog.query('cluster_id <= 12 and zphot > 1 and zphot < 1.5 and K_flag >= 0 and K_flag < 4 and Star == 0 and Mstellar > 10**9.5').shape[0]) + " - expected: 3062")
+        print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]) + " - expected: 722")
+        print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]) + " - expected: 342")
         # Construct table
         table = pd.DataFrame()
         table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
@@ -368,8 +368,22 @@ class GOGREEN:
             self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1').shape[0], 
             self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
+        expectedTable = pd.DataFrame()
+        expectedTable['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
+        expectedTable['Total Sample'] = [1302, 702, 257, 164, 54]
+        expectedTable['Cluster Members'] = [463, 504, 125, 106, 34]
+        diffTable = pd.DataFrame()
+        diffTable['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
+        diffTable['Total Sample'] = table['Total Sample'] - expectedTable['Total Sample']
+        diffTable['Cluster Members'] = table['Cluster Members'] - expectedTable['Cluster Members']
+
         # Display table
+        print("Table 2")
         print(table)
+        print("Table 2 - Expected")
+        print(expectedTable)
+        print("Table 3 - Difference")
+        print(diffTable)
         # Extract desired quantities from data for plot
         # "Bad" populations refer to those before the spectroscopic mass threshold (to be displayed with smaller points)
         passiveMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar <= 10**10.2')
@@ -407,6 +421,7 @@ class GOGREEN:
         plt.ylabel("(NUV-V)")
         plt.xlim(0.2, 2)
         plt.ylim(1, 6)
+        plt.title("Figure 1a")
         plt.legend()
 
         # Construct plot 2
@@ -438,6 +453,29 @@ class GOGREEN:
         plt.ylabel("(U-V)")
         plt.xlim(0.25, 2.25)
         plt.ylim(0.5, 2.6)
+        plt.title("Figure 1b")
+        plt.legend()
+
+        # Construct plot 3
+        plt.figure()
+        # Plot "bad" data
+        plt.scatter(passiveMembersBad['D4000'], passiveMembersBad['UMINV'], alpha=0.5, s=8, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['D4000'], starFormingMembersBad['UMINV'], alpha=0.5, s=8, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['D4000'], greenValleyMembersBad['UMINV'], alpha=0.5, s=8, marker='d', edgecolor='black', color='green')
+        plt.scatter(blueQuiescentMembersBad['D4000'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=30, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['D4000'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=30, marker='x', edgecolor='black', color='purple')
+        # Plot "good" data
+        plt.scatter(passiveMembersGood['D4000'], passiveMembersGood['UMINV'], alpha=0.5, s=30, marker='o', color='red', label='Q')
+        plt.scatter(starFormingMembersGood['D4000'], starFormingMembersGood['UMINV'], alpha=0.5, s=30, marker='*',  color='blue', label='SF')
+        plt.scatter(greenValleyMembersGood['D4000'], greenValleyMembersGood['UMINV'], alpha=0.5, s=30, marker='d', edgecolor='black', color='green', label='GV')
+        plt.scatter(blueQuiescentMembersGood['D4000'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
+        plt.scatter(postStarBurstMembersGood['D4000'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=60, marker='x', edgecolor='black', color='purple', label='PSB')
+        # Format plot 3
+        plt.xlabel("D4000")
+        plt.ylabel("(U-V)")
+        plt.xlim(0.9, 2.2)
+        plt.ylim(0.5, 2.1)
+        plt.title("Figure 3")
         plt.legend()
     #END PLOTMCNABPLOTS
 
