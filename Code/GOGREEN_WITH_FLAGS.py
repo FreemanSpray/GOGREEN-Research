@@ -36,11 +36,7 @@ class GOGREEN:
         self._photSourceCatalog = pd.DataFrame()
         self._specSourceCatalog = pd.DataFrame()
 
-        # Skip set up if catalog already is up to date
-        if not priorCatalog.empty:
-            self.catalog = priorCatalog
-        else:
-            self.init()
+        self.init(priorCatalog)
     # END __INIT__
 
     def init(self, priorCatalog:pd.DataFrame=None):
@@ -53,6 +49,11 @@ class GOGREEN:
         self._clustersCatalog = self.generateDF(clusterCatPath)
         # Remove whitespaces included with some cluster names
         self._clustersCatalog['cluster'] = self._clustersCatalog['cluster'].str.strip()
+
+        # Skip remaining set up if catalog already is up to date
+        if not priorCatalog.empty:
+            self.catalog = priorCatalog
+            return
 
         # Build path string to the redshift catalog
         redshiftCatPath = self._path + 'DR1/CATS/Redshift_catalogue.fits'
@@ -125,7 +126,6 @@ class GOGREEN:
         # Generate fractional error columns
         self.catalog['re_frac_err'] = self.catalog['re_err_robust']/self.catalog['re']
         self.catalog['re_frac_err_converted'] = self.catalog['re_err_robust_converted']/self.catalog['re_converted']
-
     # END INIT
 
     def generateFlags(self):
@@ -633,17 +633,9 @@ class GOGREEN:
         # Calculate coefficients using line-fitting algorithm
         print("count")
         print(mass.shape)
-        print("mass")
-        print(mass)
-        print("size")
-        print(size)
-        print("errs")
-        print(errs)
         s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=mass, ydata=size, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber") 
         slope = s[0]
         intercept = s[1]
-        print("slope and intercept")
-        print(slope, intercept)
         # Define x bounds
         xBounds = np.array([9.8,11.5])
         # Plot lines
