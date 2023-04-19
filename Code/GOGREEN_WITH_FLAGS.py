@@ -12,12 +12,13 @@ import scipy.optimize as opt
 
 
 class GOGREEN:
-    def __init__(self, dataPath:str):
+    def __init__(self, dataPath:str, priorCatalog:pd.DataFrame=pd.DataFrame()):
         """
         __init__ Constructor to define and initialize class members
 
-        :param dataPath: absolute path to the directory containing DR1/ and STRUCTURAL_PARA_v1.1_CATONLY/
-                         subdirectories
+        :param dataPath:       absolute path to the directory containing DR1/ and STRUCTURAL_PARA_v1.1_CATONLY/
+                                subdirectories
+        :param priorCatalog:   If we already have our catalog up to date and recompiling to update something else, we pass it in as this parameter
         """ 
         
         self.catalog = pd.DataFrame()
@@ -35,10 +36,14 @@ class GOGREEN:
         self._photSourceCatalog = pd.DataFrame()
         self._specSourceCatalog = pd.DataFrame()
 
-        self.init()
+        # Skip set up if catalog already is up to date
+        if not priorCatalog.empty:
+            self.catalog = priorCatalog
+        else:
+            self.init()
     # END __INIT__
 
-    def init(self):
+    def init(self, priorCatalog:pd.DataFrame=None):
         """
         init Helper method for initializing catalogs
         """ 
@@ -111,8 +116,8 @@ class GOGREEN:
         # Generate flags for use in plotting
         self.generateFlags()
         # Establish membership
-        self.getMembers()
-        self.getNonMembers()
+        self.setMembers()
+        self.setNonMembers()
         # Set error values (necessary because the re_err values from Galfit are not adequate)
         self.setReErr()
         # Generate converted unit columns (kpc instead of arcsec) for re values.
@@ -209,9 +214,9 @@ class GOGREEN:
         return targetCluster['Redshift'].values[0]
     # END GETCLUSTERZ
 
-    def getMembers(self) -> pd.DataFrame:
+    def setMembers(self) -> pd.DataFrame:
         """
-        getMembers Sets membership flag in the catalog based on criteria in McNab et. al. 2021
+        setMembers Sets membership flag in the catalog based on criteria in McNab et. al. 2021
 
         :return:            catalog is updated
         """
@@ -225,11 +230,11 @@ class GOGREEN:
         reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
         # Update catalog
         self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-    # END GETMEMBERS
+    # END SETMEMBERS
 
-    def getNonMembers(self) -> pd.DataFrame:
+    def setNonMembers(self) -> pd.DataFrame:
         """
-        getNonMembers Sets non-membership flag in the catalog based on criteria in McNab et. al. 2021
+        setNonMembers Sets non-membership flag in the catalog based on criteria in McNab et. al. 2021
 
         :return:            catalog is updated
         """
@@ -243,11 +248,11 @@ class GOGREEN:
         reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
         # Update catalog
         self.catalog['nonmember_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
-    # END GETNONMEMBERS
+    # END SETNONMEMBERS
 
-    def reduceDF(self, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
+    def setGoodData(self, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
         """
-        reduceDF Reduces the catalog to contain only galaxies that meet the criteria provided in
+        setGoodData Reduces the catalog to contain only galaxies that meet the criteria provided in
                  param:additionalCriteria and the standard criteria (if param:useStandards is True)
 
         :param additionalCriteria: List of any criteria outside of standard to apply
@@ -266,7 +271,7 @@ class GOGREEN:
             for criteria in self.standardCriteria:
                 reduced = self.catalog.query(criteria)
                 self.catalog['goodData'] = self.catalog['goodData'] & (self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)) # https://www.geeksforgeeks.org/python-pandas-series-astype-to-convert-data-type-of-series/
-    # END REDUCEDF
+    # END SETGOODDATA
         
     def getClusterGalaxies(self, clusterName:str) -> pd.DataFrame:
         """
@@ -346,12 +351,12 @@ class GOGREEN:
             'Star == 0',
             'K_flag < 4',
             'Mstellar > 10**9.5',
-            '(1 < zspec < 1.5) or (((Redshift_Quality < 3) or (SPECID < 0)) and (1 < zphot < 1.5))',
+            '(1 < zspec < 1.5) or ((((Redshift_Quality != 3) and (Redshift_Quality != 4)) or (SPECID < 0)) and (1 < zphot < 1.5))',
             'cluster_id <= 12'
         ]
         self.standardCriteria = searchCriteria
         # Set data quality flags according to standard criteria
-        self.reduceDF(None, True)
+        self.setGoodData(None, True)
         print("Total phot sample: " + str(self.catalog.query('cluster_id <= 12 and zphot > 1 and zphot < 1.5 and K_flag >= 0 and K_flag < 4 and Star == 0 and Mstellar > 10**9.5').shape[0]) + " - expected: 3062")
         print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]) + " - expected: 722")
         print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]) + " - expected: 342")
@@ -606,16 +611,11 @@ class GOGREEN:
                                      Default: None
         :param col:                 Specifies the column of the 2D array of subplots. For use when axes is not None.
                                      Default: None
-        :param typeRestrict:        Flag to indicate whether data should be restricted based on SFR (only necessary when allData is True)
-                                     Default: None
-                                     Value:   'Quiescent' - only passive galaxies should be considered.
-                                     Value:   'Star-Forming' - only star forming galaxies should be considered.
-                                     Value:   'Elliptical' - only galaxies with 2.5 < n < 6 should be considered.
-                                     Value:   'Spiral' - only galaxies with n < 2.5 should be considered.
-        :param color1:             The color the fit line should be.
-                                    Default: None     
-        :param bootstrap           Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
-                                    Default: True
+        :param typeRestrict:        Name indicating what population the trend is for, for use in constructing the label
+        :param color1:              The color the fit line should be.
+                                     Default: None     
+        :param bootstrap            Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
+                                     Default: True
         :return   :
 
         """
@@ -756,6 +756,10 @@ class GOGREEN:
             color = [0, 0.5, 0] # darker green
         elif lineColor == 'orange':
             color = [1, 0.8, 0.8] # pinkish
+        elif lineColor == 'yellow':
+            color = [1, 1, 0.8] # lighter yellow
+        elif lineColor == 'purple':
+            color = [0.8, 0.6, 1] # lighter purple
         # star-forming and default case
         else:
             color = [0, 0, 0.5] # darker blue
@@ -802,7 +806,7 @@ class GOGREEN:
         # Adjust plot size
         plt.figure(figsize=(10,10))
         # Reduce according to criteria
-        self.reduceDF(None, True)
+        self.setGoodData(None, True)
         # Initialize dataframes            
         members = pd.DataFrame()
         nonMembers = pd.DataFrame()
@@ -1166,8 +1170,8 @@ class GOGREEN:
             print("test failed due to unspecified error case.")
     # END TEST
     
-    def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, colorType:str=None, useLog:list=[False,False], fitLine:bool=False,
-        data:pd.DataFrame=None, color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
+    def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, colorType:str=None, useLog:list=[False,False], fitLine:bool=False, additionalCriteria:list=None, useStandards:bool=False,
+        color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
             """
             Helper function called by plot(). Handles the plotting of data.
                 
@@ -1210,9 +1214,11 @@ class GOGREEN:
                                         Value: PSB - plot post-starburst trend   
             :return:                   (x, y), representing the total number of x-values and y-values corresponding to plotted data points. Generated plot is displayed.
             """
+            # Create 'goodData' flag for future checks
+            self.setGoodData(additionalCriteria, useStandards)
             # Arbitrary establishment of variables for non-coloring case
-            aData = data.query('goodData == 1')
-            bData = data.query('goodData == 1')
+            aData = self.catalog.query('goodData == 1')
+            bData = self.catalog.query('goodData == 1')
             aLbl = None
             bLbl = None
             # Overwrite variables according to coloring scheme
@@ -1220,47 +1226,51 @@ class GOGREEN:
                 # Don't need to do anything for this case. Included so program proceeds as normal
                 pass
             elif colorType == 'membership':
-                aData = data.query('spectroscopic == 1 and goodData == 1')
+                aData = self.catalog.query('spectroscopic == 1 and goodData == 1')
                 aLbl = 'Spectroscopic z'
-                bData = data.query('photometric == 1 and goodData == 1')
+                bData = self.catalog.query('photometric == 1 and goodData == 1')
                 bLbl = 'Photometric z'
             elif colorType == 'passive':
-                aData = data.query('passive == 1 and goodData == 1')
+                aData = self.catalog.query('passive == 1 and goodData == 1')
                 aLbl = 'Quiescent'
-                bData = data.query('starForming == 1 and goodData == 1')
+                bData = self.catalog.query('starForming == 1 and goodData == 1')
                 bLbl = 'Star Forming'
             elif colorType == 'GV':
-                aData = data.query('greenValley == 1 and goodData == 1')
+                aData = self.catalog.query('greenValley == 1 and goodData == 1')
                 aLbl = 'Green Valley'
-                bData = data.query('greenValley == 0 and goodData == 1')
+                bData = self.catalog.query('greenValley == 0 and goodData == 1')
                 bLbl = 'Other'
             elif colorType == 'BQ':
-                aData = data.query('blueQuiescent == 1 and goodData == 1')
+                aData = self.catalog.query('blueQuiescent == 1 and goodData == 1')
                 aLbl = 'Blue Quiescent'
-                bData = data.query('blueQuiescent == 0 and goodData == 1')
+                bData = self.catalog.query('blueQuiescent == 0 and goodData == 1')
                 bLbl = 'Other'
             elif colorType == 'PSB': 
-                aData = data.query('postStarBurst == 1 and goodData == 1')
+                aData = self.catalog.query('postStarBurst == 1 and goodData == 1')
                 aLbl = 'Post-starburst'
-                bData = data.query('postStarBurst == 0 and goodData == 1')
+                bData = self.catalog.query('postStarBurst == 0 and goodData == 1')
                 bLbl = 'Other' 
             elif colorType == 'sersic':
-                aData = data.query('elliptical == 1 and goodData == 1')
+                aData = self.catalog.query('elliptical == 1 and goodData == 1')
                 aLbl = 'Elliptical'
-                bData = data.query('spiral == 1 and goodData == 1')
+                bData = self.catalog.query('spiral == 1 and goodData == 1')
                 bLbl = 'Spiral'
             else:
                 print(colorType, ' is not a valid coloring scheme!')
                 return
+            # Code for plotting transition population trends, like in Matharu+20
             if plotTransitionType == 'GV':
-                cData = data.query('greenValley == 1 and goodData == 1')
+                cData = self.catalog.query('greenValley == 1 and goodData == 1')
                 cLbl = 'Green Valley'
-            elif colorType == 'BQ':
-                cData = data.query('blueQuiescent == 1 and goodData == 1')
+                cColor = "green"
+            elif plotTransitionType == 'BQ':
+                cData = self.catalog.query('blueQuiescent == 1 and goodData == 1')
                 cLbl = 'Blue Quiescent'
-            elif colorType == 'PSB': 
-                cData = data.query('postStarBurst == 1 and goodData == 1')
+                cColor = "yellow"
+            elif plotTransitionType == 'PSB':
+                cData = self.catalog.query('postStarBurst == 1 and goodData == 1')
                 cLbl = 'Post-starburst'
+                cColor = "purple"
             aXVals = aData[xQuantityName].values
             bXVals = bData[xQuantityName].values
             aYVals = aData[yQuantityName].values
@@ -1284,22 +1294,9 @@ class GOGREEN:
                 else:
                     #print(aData.shape)
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
-            print("count Q")
-            print(aXVals.shape)
-            print("mass Q")
-            print(pow(10, aXVals))
-            print("size Q")
-            print(pow(10, aYVals))
-            print("errs Q")
-            print(aData["re_frac_err_converted"].values)
-            print("count SF")
-            print(bXVals.shape)
-            print("mass SF")
-            print(pow(10, bXVals))
-            print("size SF")
-            print(pow(10, bYVals))
-            print("errs SF")
-            print(bData["re_frac_err_converted"].values)
+                # Generate a third line if plotting a transitiont type
+                if plotTransitionType != None:
+                    self.MSRfit(cData, useLog, axes, row, col, typeRestrict=cLbl, color=cColor, bootstrap=bootstrap)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
             if plotErrBars:
@@ -1350,7 +1347,7 @@ class GOGREEN:
     # END PLOTUNWRAPPED
 
 
-    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None, colors:list=None, 
+    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=[], useMembers:str='only', colorType:str=None, colors:list=None, 
         useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
@@ -1407,8 +1404,6 @@ class GOGREEN:
         """
         # Initialize plot
         plt.figure(figsize=(8,6))
-        # Create 'goodData' flag for future checks
-        self.reduceDF(additionalCriteria, useStandards)
         # Check if plot colors were provided by the user
         if colors != None:
             color1 = colors[0]
@@ -1421,28 +1416,31 @@ class GOGREEN:
             else:
                 color1 = "green"
                 color2 = "orange"
+        # Establish membership criteria
+        if useMembers == None:
+            print("Please specify membership requirements!")
+            return
+        elif useMembers == 'all':
+            # Reduce data to only contain galaxies classified as members or non-members
+            additionalCriteria.append('member_adjusted == 1 or nonmember_adjusted == 1')
+        elif useMembers == 'only':
+            # Reduce data to only contain galaxies classified as members
+            additionalCriteria.append('member_adjusted == 1')
+        elif useMembers == 'not':
+            # Reduce data to only contain galaxies not classified as members
+            additionalCriteria.append('nonmember_adjusted == 1')
+        else:
+            print(useMembers, " is not a valid membership requirement!")
+            return
         # Plot only the cluster specified
         if plotType == 1:
             if clusterName == None:
                 print("No cluster name provided!")
                 return
-            if useMembers == None:
-                print("Please specify membership requirements!")
-                return
-            elif useMembers == 'all':
-                # Get all galaxies associated with this cluster
-                data = self.getClusterGalaxies(clusterName)
-            elif useMembers == 'only':
-                # Reduce data to only contain galaxies classified as members
-                data = self.getMembers(clusterName)
-            elif useMembers == 'not':
-                # Reduce data to only contain galaxies not classified as members
-                data = self.getNonMembers(clusterName)
-            else:
-                print(useMembers, " is not a valid membership requirement!")
-                return
             # Plot data
-            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
+            additionalCriteria.append('cluster == ' + clusterName)
+            xTot, yTot = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=additionalCriteria, 
+                useStandards=useStandards, color1=color1, color2=color2, plot=plt, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
         # Plot all clusters individually in a subplot
         elif plotType == 2:
             # Initialize data count totals (used when running test suite)
@@ -1458,23 +1456,9 @@ class GOGREEN:
                     if (currentIndex == len(self._structClusterNames)):
                         break
                     currentClusterName = self._structClusterNames[currentIndex]
-                    if useMembers == None:
-                        print("Please specify membership requirements!")
-                        return
-                    elif useMembers == 'all':
-                        # Get all galaxies associated with this cluster
-                        data = self.getClusterGalaxies(currentClusterName)
-                    elif useMembers == 'only':
-                        # Reduce data to only contain galaxies classified as members
-                        data = self.getMembers(currentClusterName)
-                    elif useMembers == 'not':
-                        # Reduce data to only contain galaxies not classified as members
-                        data = self.getNonMembers(currentClusterName)
-                    else:
-                        print(useMembers, " is not a valid membership requirement!")
-                        return
-                    # Plot data
-                    x, y = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, axes[i][j], axes, i, j, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
+                    # Plot data for current cluster
+                    x, y = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=additionalCriteria.append('cluster == ' + currentClusterName), 
+                        useStandards=useStandards, color1=color1, color2=color2, plot=axes[i][j], axes=axes, row=i, col=j, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
                     # Update data count totals
                     xTot+=x
                     yTot+=y
@@ -1497,25 +1481,8 @@ class GOGREEN:
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
         # Plot all clusters on the same plot            
         elif plotType == 3:
-            # Set an initial value to append to.
-            data = pd.DataFrame()
-            for clusterName  in self._structClusterNames:
-                if useMembers == None:
-                    print("Please specify membership requirements!")
-                    return
-                elif useMembers == 'all':
-                    # Get all galaxies associated with this cluster
-                    data = data.append(self.getClusterGalaxies(clusterName))
-                elif useMembers == 'only':
-                    # Reduce data to only contain galaxies classified as members
-                    data = data.append(self.getMembers(clusterName))
-                elif useMembers == 'not':
-                    # Reduce data to only contain galaxies not classified as members
-                    data = data.append(self.getNonMembers(clusterName))
-                else:
-                    print(useMembers, " is not a valid membership requirement!")
-                    return
-            xTot, yTot = self.plotUnwrapped(xQuantityName, yQuantityName, colorType, useLog, fitLine, data, color1, color2, plt, axes=None, row=None, col=None, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
+            xTot, yTot = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=additionalCriteria, 
+                useStandards=useStandards, color1=color1, color2=color2, plot=plt, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
         else:
             print(plotType, " is not a valid plotting scheme!")
             return
