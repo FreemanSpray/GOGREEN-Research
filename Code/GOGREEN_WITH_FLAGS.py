@@ -1344,7 +1344,7 @@ class GOGREEN:
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
             # Plot van der Wel et al. 2014 line in the case where we are plotting MSR (passive v starforming)
-            if xQuantityName == 'Mstellar' and (yQuantityName == 're' or yQuantityName == 're_converted') and colorType == "Passive":
+            if xQuantityName == 'Mstellar' and (yQuantityName == 're' or yQuantityName == 're_converted') and colorType == "passive":
                 self.plotVanDerWelLines()
             # Return data counts (used when running test suite)
             xA = aXVals.shape[0]
