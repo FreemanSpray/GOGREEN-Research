@@ -1097,8 +1097,8 @@ class GOGREEN:
                             cluster = "SpARCS1616"
                         else:
                             cluster = None
-                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
-                        xACountUVJ, xBCountUVJ, yACountUVJ, yBCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
+                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, additionalCriteria=[], useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xACountUVJ, xBCountUVJ, yACountUVJ, yBCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, additionalCriteria=[], useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
                         # End test early (and with specific error) if major discrepency is found
                         if xACountMSR != yACountMSR or xACountUVJ != yACountUVJ or xBCountMSR != yBCountMSR or xBCountUVJ != yBCountUVJ:
                             print("test failed. X and Y data counts do not agree.")
@@ -1118,7 +1118,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, additionalCriteria=[], useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write A count
                 f.write('(' + str(xACount) + ', ')
                 # Write B count
@@ -1129,7 +1129,7 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
             # Plot MSR plot for all clusters combined
-            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, additionalCriteria=[], useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write(str(xATotExpected))
             f.write(str(xBTotExpected))
@@ -1144,7 +1144,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, additionalCriteria=[], useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write A count
                 f.write('(' + str(xACount) + ', ')
                 # Write B count
@@ -1155,7 +1155,7 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
             # Plot MSR plot for all clusters combined
-            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, additionalCriteria=[], useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write('(' + str(xATot) + ', ' + str(xBTot) + ') ')
             if xATot != xATotExpected or xBTot != xBTotExpected:
@@ -1220,6 +1220,7 @@ class GOGREEN:
             :return:                   (xA, xB, yA, yB), representing the total number of x-values and y-values corresponding to plotted data points of two different populations. Generated plot is displayed.
             """
             # Create 'goodData' flag for future checks
+            print(additionalCriteria)
             self.setGoodData(additionalCriteria, useStandards)
             # Arbitrary establishment of variables for non-coloring case
             aData = self.catalog.query('goodData == 1')
@@ -1473,8 +1474,9 @@ class GOGREEN:
                         break
                     currentClusterName = self._structClusterNames[currentIndex]
                     # Plot data for current cluster
-                    clusterCriterion = 'cluster == \'' + currentClusterName + '\''
-                    xA, xB, yA, yB = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=additionalCriteria.append('cluster == ' + clusterCriterion), 
+                    currentAdditionalCriteria = additionalCriteria.copy()
+                    currentAdditionalCriteria.append('cluster == \'' + currentClusterName + '\'')
+                    xA, xB, yA, yB = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=currentAdditionalCriteria, 
                         useStandards=useStandards, color1=color1, color2=color2, plot=axes[i][j], axes=axes, row=i, col=j, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
                     # Update data count totals
                     xATot+=xA
