@@ -638,7 +638,7 @@ class GOGREEN:
         slope = s[0]
         intercept = s[1]
         # Define x bounds
-        xBounds = np.array([9.8,11.5])
+        xBounds = np.array([9.5,11.5])
         # Plot lines
         if row != None and col != None:
             # Check for subplots
@@ -768,7 +768,7 @@ class GOGREEN:
         m = 1.213
         b = -2.44
         rng = np.random.RandomState(1234567890)
-        randXLine = 9.8 + rng.random()*2.7
+        randXLine = 9.5 + rng.random()*2.7
         yLine = m*randXLine + b
         randUnc = rng.random()/2
         nFake = []
@@ -1097,14 +1097,14 @@ class GOGREEN:
                             cluster = "SpARCS1616"
                         else:
                             cluster = None
-                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, additionalCriteria=[], useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
-                        xACountUVJ, xBCountUVJ, yACountUVJ, yBCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, additionalCriteria=[], useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
+                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xACountUVJ, xBCountUVJ, yACountUVJ, yBCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
                         # End test early (and with specific error) if major discrepency is found
                         if xACountMSR != yACountMSR or xACountUVJ != yACountUVJ or xBCountMSR != yBCountMSR or xBCountUVJ != yBCountUVJ:
                             print("test failed. X and Y data counts do not agree.")
                             return
                         if xACountMSR != xACountUVJ:
-                            print("test failed. MSR and UVJ counts do not agree.")
+                            print("test failed. stellar mass-size relation and UVJ counts do not agree.")
                             return
                         # Write A count
                         f.write('(' + str(xACountMSR) + ', ')
@@ -1118,7 +1118,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, additionalCriteria=[], useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write A count
                 f.write('(' + str(xACount) + ', ')
                 # Write B count
@@ -1129,7 +1129,7 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
             # Plot MSR plot for all clusters combined
-            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, additionalCriteria=[], useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write(str(xATotExpected))
             f.write(str(xBTotExpected))
@@ -1144,7 +1144,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, additionalCriteria=[], useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write A count
                 f.write('(' + str(xACount) + ', ')
                 # Write B count
@@ -1155,7 +1155,7 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
             # Plot MSR plot for all clusters combined
-            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, additionalCriteria=[], useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write('(' + str(xATot) + ', ' + str(xBTot) + ') ')
             if xATot != xATotExpected or xBTot != xBTotExpected:
@@ -1191,9 +1191,10 @@ class GOGREEN:
                                         Value:   [False,True] - y axis in log scale
                                         Value:   [True,False] - x axis in log scale
                                         Value:   [True,True] - both axis in log scale
-            :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
-                                        (note: the default x and y will be in log, however specifically selected values will correspond to the useLog list)
-                                        (note: not currently configured to work with plot type 2)
+            :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass.
+                                        Default: False 
+            :param additionalCriteria: List of desired criteria the plotted galaxies should meet
+                                        Default: None
             :param data:               Set of data points to be plotted. 
             :param color1:             Specifies what color should be used when plotting first type of data
                                         Value:   (r,g,b)
@@ -1219,8 +1220,8 @@ class GOGREEN:
                                         Value: PSB - plot post-starburst trend   
             :return:                   (xA, xB, yA, yB), representing the total number of x-values and y-values corresponding to plotted data points of two different populations. Generated plot is displayed.
             """
-            # Create 'goodData' flag for future checks
             print(additionalCriteria)
+            # Create 'goodData' flag for future checks
             self.setGoodData(additionalCriteria, useStandards)
             # Arbitrary establishment of variables for non-coloring case
             aData = self.catalog.query('goodData == 1')
@@ -1272,11 +1273,11 @@ class GOGREEN:
             elif plotTransitionType == 'BQ':
                 cData = self.catalog.query('blueQuiescent == 1 and goodData == 1')
                 cLbl = 'Blue Quiescent'
-                cColor = "orange"
+                cColor = "black"
             elif plotTransitionType == 'PSB':
                 cData = self.catalog.query('postStarBurst == 1 and goodData == 1')
                 cLbl = 'Post-starburst'
-                cColor = "purple"
+                cColor = "black"
             aXVals = aData[xQuantityName].values
             bXVals = bData[xQuantityName].values
             aYVals = aData[yQuantityName].values
@@ -1344,8 +1345,8 @@ class GOGREEN:
                         plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
-            # Plot van der Wel et al. 2014 line in the case where we are plotting MSR (passive v starforming)
-            if xQuantityName == 'Mstellar' and (yQuantityName == 're' or yQuantityName == 're_converted') and colorType == "passive":
+            # Plot van der Wel et al. 2014 line in the case where we are plotting the stellar mass-size relation (passive v starforming) for the field.
+            if xQuantityName == 'Mstellar' and (yQuantityName == 're' or yQuantityName == 're_converted') and colorType == "passive" and ("nonmember_adjusted == 1" in additionalCriteria or "nonmember_adjusted == 1" in self.standardCriteria):
                 self.plotVanDerWelLines()
             # Return data counts (used when running test suite)
             xA = aXVals.shape[0]
@@ -1361,7 +1362,7 @@ class GOGREEN:
     # END PLOTUNWRAPPED
 
 
-    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=[], useMembers:str='only', colorType:str=None, colors:list=None, 
+    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, useMembers:str='only', colorType:str=None, colors:list=None, 
         useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
@@ -1373,8 +1374,6 @@ class GOGREEN:
                                     Value: 2 - plot all the clusters on seperate plots (subplot)
                                     Value: 3 - plot all the clusters on a single plot
         :param clusterName:        Name of the cluster to plot (if param:plotType is 1)
-                                    Default: None
-        :param additionalCriteria: List of desired criteria the plotted galaxies should meet
                                     Default: None
         :param useMembers:        Flag to indicate whether only cluster members should be plotted or only non-members should be plotted.
                                     Default: 'only' - only members
@@ -1402,9 +1401,8 @@ class GOGREEN:
                                     Value:   [False,True] - y axis in log scale
                                     Value:   [True,False] - x axis in log scale
                                     Value:   [True,True] - both axis in log scale
-        :param fitLine:             Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
-                                     (note: the default x and y will be in log, however specifically selected values will correspond to the useLog list)
-                                     (note: not currently configured to work with plot type 2)
+        :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
+                                    Default: False
         :param bootstrap           Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
                                     Default: True
         :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted
@@ -1416,6 +1414,8 @@ class GOGREEN:
                                     Value: PSB - plot post-starburst trend                     
         :return:                   (xA, xB, yA, yB), representing the total number of x-values and y-values corresponding to plotted data points in two populations. Generated plot is displayed.
         """
+        # Initialize additional criteria
+        additionalCriteria = []
         # Initialize plot
         plt.figure(figsize=(8,6))
         # Check if plot colors were provided by the user
@@ -1520,5 +1520,6 @@ class GOGREEN:
                 # Avoid calling legend() if there are no labels
                 plt.legend()
             plt.show()
+        # Return
         return (xATot, xBTot, yATot, yBTot)
     # END PLOT
