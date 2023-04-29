@@ -352,15 +352,15 @@ class GOGREEN:
             'Star == 0',
             'K_flag < 4',
             'Mstellar > 10**9.5',
-            '(1 < zspec < 1.5) or ((((Redshift_Quality != 3) and (Redshift_Quality != 4)) or (SPECID < 0)) and (1 < zphot < 1.5))',
+            '(1 < zspec < 1.5) or (((Redshift_Quality < 3) or (SPECID < 0)) and (1 < zphot < 1.5))',
             'cluster_id <= 12'
         ]
         self.standardCriteria = searchCriteria
         # Set data quality flags according to standard criteria
         self.setGoodData(None, True)
         print("Total phot sample: " + str(self.catalog.query('cluster_id <= 12 and zphot > 1 and zphot < 1.5 and K_flag >= 0 and K_flag < 4 and Star == 0 and Mstellar > 10**9.5').shape[0]) + " - expected: 3062")
-        print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0').shape[0]) + " - expected: 722")
-        print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and (Redshift_Quality == 3 or Redshift_Quality == 4) and Star == 0 and Mstellar > 10**10.2').shape[0]) + " - expected: 342")
+        print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and Redshift_Quality >= 3 and Star == 0').shape[0]) + " - expected: 722")
+        print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and Redshift_Quality >= 3 and Star == 0 and Mstellar > 10**10.2').shape[0]) + " - expected: 342")
         # Construct table
         table = pd.DataFrame()
         table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
