@@ -632,8 +632,7 @@ class GOGREEN:
         # Convert to fractional error
         errs = errs/size
         # Calculate coefficients using line-fitting algorithm
-        print("count")
-        print(mass.shape)
+        print(typeRestrict + " count: " + str(mass.shape[0]))
         s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=mass, ydata=size, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber") 
         slope = s[0]
         intercept = s[1]
@@ -782,50 +781,45 @@ class GOGREEN:
     # END EVALLINEFIT
         
 
-    def getRatio(self, x:float=None, y:float=None, bootstrap:bool=True, limitRange:bool=True, useTransition:bool=False) -> list:
+    def compTrends(self, x:float=None, y:float=None, bootstrap:bool=True, limitRange:bool=True, plotType:str="default") -> tuple:
         """
-        getRatio Calculates the ratio of member over non-member galaxies (for both passive and star-forming) and plots the trendlines for these 4 
-        populations as well as (optionally) transition populations
+        compTrends Calculates the ratio of member over non-member galaxies and plots relevant trendlines.
         :param x:           X value at which the comparison should be made
                              Default: None
         :param y:           Y value at which the comparison should be made
                              Default: None
         :param limitRange:  Flag to indicate whether the plot should be restricted to x = [9.5, 11.5] and y = [-0.75, 1.25]
                              Default: True
-        :param limitRange:  Flag to indicate whether trends for transition populations should be included
-                             Default: False
-        :return: size 2 list of the two ratios of member over non-member galaxies (first element is for quiescent, second is for star-forming)
+        :param plotType:    Determines specific behavior of the function
+                             Value: "default" - quiescent and star-forming ratios are calculated separately
+                             Value: "transition" - transition lines are plotted as well
+                             Value: "lit" - whole population's ratio is calculated and compared to the literature.
+        :return: tuple of up to two distinct population ratios of member over non-member galaxies, plus between 2 and 7 trendlines are plotted
         """
         # Adjust plot size
         plt.figure(figsize=(10,10))
-        # Reduce according to criteria
+        # Reduce according to standard criteria
         self.setGoodData(None, True)
-        # Initialize dataframes            
-        members = pd.DataFrame()
-        nonMembers = pd.DataFrame()
-        # For each cluster, add members and non-members to respective dataframes
-        for clusterName in self._structClusterNames:
-            members = members.append(self.getMembers(clusterName))
-            nonMembers = nonMembers.append(self.getNonMembers(clusterName))
-        # Extract desired quantities from data
-        passiveMembers = members.query('passive == 1 and goodData == 1')
-        passiveNonMembers = nonMembers.query('passive == 1 and goodData == 1')
-        starFormingMembers = members.query('starForming == 1 and goodData == 1')
-        starFormingNonMembers = nonMembers.query('starForming == 1 and goodData == 1')
-        # Plot quiescent and sf trends for members and nonmembers (4 lines total)
-        mMemberQ, bMemberQ = self.MSRfit(data=passiveMembers, useLog=[True, True], typeRestrict='Quiescent cluster', color='red', bootstrap=bootstrap)
-        mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming cluster', color='blue', bootstrap=bootstrap)
-        mNonMemberQ, bNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent field', color='orange', bootstrap=bootstrap)
-        mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
+        # Quiescent and star-forming trends for default or transition option
+        if plotType == "default" or plotType == "transition":
+            passiveMembers = self.catalog.query('member_adjusted == 1 and passive == 1 and goodData == 1')
+            passiveNonMembers = self.catalog.query('nonmember_adjusted == 1 and passive == 1 and goodData == 1')
+            starFormingMembers = self.catalog.query('member_adjusted == 1 and starForming == 1 and goodData == 1')
+            starFormingNonMembers = self.catalog.query('nonmember_adjusted == 1 and starForming == 1 and goodData == 1')
+            # Plot quiescent and sf trends for members and nonmembers (4 lines total)
+            mMemberQ, bMemberQ = self.MSRfit(data=passiveMembers, useLog=[True, True], typeRestrict='Quiescent cluster', color='red', bootstrap=bootstrap)
+            mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming cluster', color='blue', bootstrap=bootstrap)
+            mNonMemberQ, bNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent field', color='orange', bootstrap=bootstrap)
+            mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
         # Transition galaxy option
-        if useTransition:
+        if plotType == "transition":
             # Extracted desired quantities from data
-            gvMembers = members.query('greenValley == 1 and goodData == 1')
-            gvNonMembers = nonMembers.query('greenValley == 1 and goodData == 1')
-            bqMembers = members.query('blueQuiescent == 1 and goodData == 1')
-            bqNonMembers = nonMembers.query('blueQuiescent == 1 and goodData == 1')
-            psbMembers = members.query('postStarBurst == 1 and goodData == 1')
-            psbNonMembers = nonMembers.query('postStarBurst == 1 and goodData == 1')
+            gvMembers = self.catalog.query('member_adjusted == 1 and greenValley == 1 and goodData == 1')
+            gvNonMembers = self.catalog.query('nonmember_adjusted == 1 and greenValley == 1 and goodData == 1')
+            bqMembers = self.catalog.query('member_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
+            bqNonMembers = self.catalog.query('nonmember_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
+            psbMembers = self.catalog.query('member_adjusted == 1 and postStarBurst == 1 and goodData == 1')
+            psbNonMembers = self.catalog.query('nonmember_adjusted == 1 and postStarBurst == 1 and goodData == 1')
             # Plot trends (6 additional lines)
             _, _ = self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV cluster', color='purple', bootstrap=bootstrap)
             _, _ = self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV field', color='pink', bootstrap=bootstrap)
@@ -834,36 +828,85 @@ class GOGREEN:
             _, _ = self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB cluster', color='brown', bootstrap=bootstrap)
             # Not plotting psbNonMembers because it will crash due to there being too few data points.
             #_, _ = self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB field', color='yellow', bootstrap=bootstrap)
-        if limitRange:
-            plt.xlim(9.5, 11.5)
-            plt.ylim(-0.75, 1.25)
-        plt.legend()
-        # if x or y values are provided, return ratio at that value
-        if x != None and y == None:
-            # Get ratios at a certain x value
-            pointMemberQ = x*mMemberQ + bMemberQ
-            pointMemberSF = x*mMemberSF + bMemberSF 
-            pointNonMemberQ = x*mNonMemberQ + bNonMemberQ 
-            pointNonMemberSF = x*mNonMemberSF + bNonMemberSF
-            ratioQ = pointMemberQ/pointNonMemberQ
-            ratioSF = pointMemberSF/pointNonMemberSF
-            return [ratioQ, ratioSF]
-        elif y != None and x == None:
-            # Get ratios at a certain y value
-            pointMemberQ = (y/mMemberQ) - (bMemberQ/mMemberQ)
-            pointMemberSF = (y/mMemberSF) - (bMemberSF/mMemberSF)
-            pointNonMemberQ = (y/mNonMemberQ) - (bNonMemberQ/mNonMemberQ) 
-            pointNonMemberSF = (y/mNonMemberSF) - (bNonMemberSF/mNonMemberSF) 
-            ratioQ = pointMemberQ/pointNonMemberQ
-            ratioSF = pointMemberSF/pointNonMemberSF
-            return [ratioQ, ratioSF]
-        # Error cases
-        elif x != None and y != None:
-            print("Error: Both x and y values were provided. Please provide only one.")
-            return [-1]    
-        else:
-            print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
-            return [-1]     
+        # Ratio calculation for default or transition option
+        if plotType == "default" or plotType == "transition":
+            # if x or y values are provided, return ratio at that value
+            if x != None and y == None:
+                # Get ratios at a certain x value
+                pointMemberQ = x*mMemberQ + bMemberQ
+                pointMemberSF = x*mMemberSF + bMemberSF 
+                pointNonMemberQ = x*mNonMemberQ + bNonMemberQ 
+                pointNonMemberSF = x*mNonMemberSF + bNonMemberSF
+                ratioQ = pointMemberQ/pointNonMemberQ
+                ratioSF = pointMemberSF/pointNonMemberSF
+            elif y != None and x == None:
+                # Get ratios at a certain y value
+                pointMemberQ = (y/mMemberQ) - (bMemberQ/mMemberQ)
+                pointMemberSF = (y/mMemberSF) - (bMemberSF/mMemberSF)
+                pointNonMemberQ = (y/mNonMemberQ) - (bNonMemberQ/mNonMemberQ) 
+                pointNonMemberSF = (y/mNonMemberSF) - (bNonMemberSF/mNonMemberSF) 
+                ratioQ = pointMemberQ/pointNonMemberQ
+                ratioSF = pointMemberSF/pointNonMemberSF
+            # Error cases
+            elif x != None and y != None:
+                print("Error: Both x and y values were provided. Please provide only one.")
+                return (np.nan, np.nan)    
+            else:
+                print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
+                return (np.nan, np.nan)  
+            # Format plot
+            if limitRange:
+                plt.xlim(9.5, 11.5)
+                plt.ylim(-0.75, 1.25)
+            plt.legend() 
+            # Return a tuple containing the ratios
+            return (ratioQ, ratioSF)
+        # Ratio calculation for lit option
+        if plotType == "lit":
+            members = self.catalog.query('member_adjusted == 1 and goodData == 1')
+            nonMembers = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
+            mMember, bMember = self.MSRfit(data=members, useLog=[True, True], typeRestrict='cluster', color="orange", bootstrap=bootstrap)
+            mNonMember, bNonMember = self.MSRfit(data=nonMembers, useLog=[True, True], typeRestrict='field', color="green", bootstrap=bootstrap)
+            # if x or y values are provided, return ratio at that value
+            if x != None and y == None:
+                # Get ratios at a certain x value
+                pointMember = x*mMember + bMember
+                pointNonMember = x*mNonMember + bNonMember
+                ratio = pointMember/pointNonMember
+                diff = pointMember - pointNonMember
+            elif y != None and x == None:
+                # Get ratios at a certain y value
+                pointMember = (y/mMember) - (bMemberQ/mMember)
+                pointNonMember = (y/mNonMember) - (bNonMember/mNonMember) 
+                ratio = pointMember/pointNonMember
+                diff = pointMember - pointNonMember
+            # Error cases
+            elif x != None and y != None:
+                print("Error: Both x and y values were provided. Please provide only one.")
+                return (np.nan, np.nan)     
+            else:
+                print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
+                return (np.nan, np.nan) 
+            # Format plot
+            if limitRange:
+                plt.xlim(9.5, 11.5)
+                plt.ylim(-0.75, 1.25)
+            plt.legend()
+            # Construct lit comparison plot
+            plt.figure()
+            # Cooper+12 measured ~0.1 at redshift ~0.8
+            plt.scatter(0.8, 0.1, label="Cooper+12")
+            # Cooper+12 measured ~0.1 at redshift ~1.3
+            plt.scatter(0.8, 0.1, label="Raichoor+12")
+            # Currently estimating our redshift to be at 1.25
+            plt.scatter(1.25, diff, label="Our measurement")
+            plt.xlabel("Redshift")
+            plt.ylabel("Dlog Re (cluster - field)")
+            plt.xlim(0, 2.5)
+            plt.ylim(-0.2, 0.35)
+            plt.legend()
+            # Return our ratio and a nan value in the second slot in case this is incorrectly accessed
+            return (ratio, np.nan)  
     #END GETRATIO
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
