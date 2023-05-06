@@ -3,41 +3,44 @@ from astropy.io import fits
 from astropy.cosmology import WMAP9 as cosmo
 from astropy import units as u
 import matplotlib.pyplot as plt
+import matplotlib.markers as mrk
 import numpy as np
 import pandas as pd
-import random as rng
 import os
 import warnings
 import scipy.optimize as opt
-import scipy.interpolate as interp
 
 
 
 class GOGREEN:
-    def __init__(self, dataPath:str):
+    def __init__(self, dataPath:str, priorCatalog:pd.DataFrame=pd.DataFrame()):
         """
         __init__ Constructor to define and initialize class members
 
-        :param dataPath: absolute path to the directory containing DR1/ and STRUCTURAL_PARA_v1.1_CATONLY/
-                         subdirectories
+        :param dataPath:       absolute path to the directory containing DR1/ and STRUCTURAL_PARA_v1.1_CATONLY/
+                                subdirectories
+        :param priorCatalog:   If we already have our catalog up to date and recompiling to update something else, we pass it in as this parameter
         """ 
         
         self.catalog = pd.DataFrame()
+        self.sourceCatalog = pd.DataFrame()
         self.standardCriteria = []
         # Private Members
         self._path = dataPath
         self._structClusterNames = ['SpARCS0219', 'SpARCS0035','SpARCS1634', 'SpARCS1616', 'SPT0546', 'SpARCS1638',
                                     'SPT0205', 'SPT2106', 'SpARCS1051', 'SpARCS0335', 'SpARCS1034']
         self._clustersCatalog = pd.DataFrame()
-        self._photoCatalog = pd.DataFrame()
+        self._combinedSourceCatalog = pd.DataFrame()
         self._redshiftCatalog = pd.DataFrame()
         self._galfitCatalog = pd.DataFrame()
         self._matchedCatalog = pd.DataFrame()
+        self._photSourceCatalog = pd.DataFrame()
+        self._specSourceCatalog = pd.DataFrame()
 
-        self.init()
+        self.init(priorCatalog)
     # END __INIT__
 
-    def init(self):
+    def init(self, priorCatalog:pd.DataFrame=None):
         """
         init Helper method for initializing catalogs
         """ 
@@ -48,15 +51,32 @@ class GOGREEN:
         # Remove whitespaces included with some cluster names
         self._clustersCatalog['cluster'] = self._clustersCatalog['cluster'].str.strip()
 
-        # Build path string to the photometric catalog
-        photoCatPath = self._path + 'DR1/CATS/Photo.fits'
-        # Generate a DataFrame of the catalog data
-        self._photoCatalog = self.generateDF(photoCatPath)
+        # Skip remaining set up if catalog already is up to date
+        if not priorCatalog.empty:
+            self.catalog = priorCatalog
+            return
 
         # Build path string to the redshift catalog
         redshiftCatPath = self._path + 'DR1/CATS/Redshift_catalogue.fits'
         # Generate a DataFrame of the catalog data
         self._redshiftCatalog = self.generateDF(redshiftCatPath)
+
+        # Build path string to the phot source catalogue
+        photSourceCatPath = self._path + 'STELLPOPS_V2/photometry_stellpops.fits'
+        # Generate a DataFrame of the catalog data
+        self._photSourceCatalog = self.generateDF(photSourceCatPath)
+
+        # Build path string to the spec source catalogue
+        specSourceCatPath = self._path + 'STELLPOPS_V2/redshifts_stellpops.fits'
+        # Generate a DataFrame of the catalog data
+        self._specSourceCatalog = self.generateDF(specSourceCatPath)
+
+        # Merge source catalogs into a combined catalog
+        merge_col = ['SPECID']
+        # This only ouputs columns with names different than those in the photometric source table.  
+        # Make sure that SPECID is added back in as we will match on that field
+        cols_to_use = self._specSourceCatalog.columns.difference(self._photSourceCatalog.columns).tolist() + merge_col
+        self._combinedSourceCatalog = self.merge(self._photSourceCatalog, self._specSourceCatalog[cols_to_use], merge_col)
 
         # Build a DataFrame for each galfit and matched structural parameter cluster (11 total)
         # Then combine them into a single galfit catalog and a single matched catalog
@@ -80,7 +100,7 @@ class GOGREEN:
             matchedClusterDF = self.generateDF(matchedCatPath + matchedClusterFilename)
             # Convert PHOTCATID to cPHOTID
             # Find a cPHOTID of the cluster in the photometric catalog 
-            tempCPHOTID = self._photoCatalog[self._photoCatalog['Cluster'] == clusterName].iloc[0]['cPHOTID']
+            tempCPHOTID = self._combinedSourceCatalog[self._combinedSourceCatalog['Cluster'] == clusterName].iloc[0]['cPHOTID']
             # Extract the source ID and cluster ID from the temporary cPHOTID
             idPrefix = int(str(tempCPHOTID)[:3])*int(1e6)
             # Convert the structural catalog PHOTCATID into the photometric catalog cPHOTID
@@ -89,9 +109,63 @@ class GOGREEN:
             # Combine it with the main struct matched DataFrame
             self._matchedCatalog = self._matchedCatalog.append(matchedClusterDF)
 
-        # Merge photomatched structural catalog with photometric catalog
-        self.catalog = self.merge(self._photoCatalog, self._matchedCatalog, 'cPHOTID')
+        # Merge combined source catalog with photomatched structural catalog by cPHOTID.
+        self.catalog = self.merge(self._combinedSourceCatalog, self._matchedCatalog, 'cPHOTID')
+        # readjust to preserve NaN values after merge
+        self.catalog = self.catalog.replace(100000000000000000000, np.nan)
+        # Generate cluster-centric distance columns
+        self.calcClusterCentricDist()
+        # Generate flags for use in plotting
+        self.generateFlags()
+        # Establish membership
+        self.setMembers()
+        self.setNonMembers()
+        # Set error values (necessary because the re_err values from Galfit are not adequate)
+        self.setReErr()
+        # Generate converted unit columns (kpc instead of arcsec) for re values.
+        self.reConvert()
+        # Generate fractional error columns
+        self.catalog['re_frac_err'] = self.catalog['re_err_robust']/self.catalog['re']
+        self.catalog['re_frac_err_converted'] = self.catalog['re_err_robust_converted']/self.catalog['re_converted']
     # END INIT
+
+    def generateFlags(self):
+        """
+        init Helper method for initializing flags relevant to plotting
+        """ 
+        # define queries
+        #passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        passiveQuery = 'NUVMINV > 2 * VMINJ + 1.6' #(𝑁𝑈𝑉 − 𝑉 ) > 2(𝑉 − 𝐽) + 1.6(from McNab et al 2021)
+        #starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)' #(from van der Burg et al. 2020)
+        starFormingQuery = 'NUVMINV < 2 * VMINJ + 1.1' #(𝑁𝑈𝑉 − 𝑉 ) < 2(𝑉 − 𝐽) + 1.1 (from McNab et al 2021)
+        gvQuery = '(2 * VMINJ + 1.1 <= NUVMINV) and (NUVMINV <= 2 * VMINJ + 1.6)' # 2(𝑉 − 𝐽) + 1.1 ≤ (𝑁𝑈𝑉 − 𝑉 ) ≤ 2(𝑉 − 𝐽) + 1.6 (from McNab et al 2021)
+        bqQuery = '((VMINJ + 0.45 <= UMINV) and (UMINV <= VMINJ + 1.35)) and ((-1.25 * VMINJ + 2.025 <= UMINV) and (UMINV <= -1.25 * VMINJ + 2.7))' # (𝑉 − 𝐽) + 0.45 ≤ (𝑈 − 𝑉 ) ≤ (𝑉 − 𝐽) + 1.35 ### − 1.25 (𝑉 − 𝐽) + 2.025 ≤ (𝑈 − 𝑉 ) ≤ −1.25 (𝑉 − 𝐽) + 2.7 (from McNab et al 2021)
+        psbQuery = 'D4000 < 1.45 and delta_BIC < -10' # (D4000 < 1.45) ∩ (ΔBIC < −10) (from McNab et al 2021)
+        ellipticalQuery = '2.5 < n < 6'
+        spiralQuery = 'n <= 2.5'
+        # Initialize flags to be used in plotting
+        # Quality flag
+        self.catalog['goodData'] = 1
+        # Population flags
+        reduced = self.catalog[~self.catalog['zspec'].isna()]
+        self.catalog['spectroscopic'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog[self.catalog['zspec'].isna()]
+        self.catalog['photometric'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int) # this is in line with how phot was being calculated previously. We may want to try a solution not dependent on the spec calculation
+        reduced = self.catalog.query(passiveQuery)
+        self.catalog['passive'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(starFormingQuery)
+        self.catalog['starForming'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(gvQuery)
+        self.catalog['greenValley'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(bqQuery)
+        self.catalog['blueQuiescent'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(psbQuery)
+        self.catalog['postStarBurst'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(ellipticalQuery)
+        self.catalog['elliptical'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+        reduced = self.catalog.query(spiralQuery)
+        self.catalog['spiral'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+    # END GENERATEFLAGS
 
     def generateDF(self, filePath:str) -> pd.DataFrame:
         """
@@ -141,67 +215,64 @@ class GOGREEN:
         return targetCluster['Redshift'].values[0]
     # END GETCLUSTERZ
 
-    def getMembers(self, clusterName:str) -> pd.DataFrame:
+    def setMembers(self) -> pd.DataFrame:
         """
-        getMembers Gets the member galaxies of a cluster based on the galaxy redshift with respect to the
-                   best estimate of the cluster redshift. Spectroscopic members are those with (zspec-zclust) < 0.02(1+zspec)
-                   and photometric members are those with (zphot-zclust) < 0.08(1+zphot).
+        setMembers Sets membership flag in the catalog based on criteria in McNab et. al. 2021
 
-        :param clusterName: Name of the cluster whose members should be returned
-        :return:            Pandas DataFrame containing the galaxies whose redshift match the membership requirements
+        :return:            catalog is updated
         """
-        clusterZ = self.getClusterZ(clusterName)
-        allClusterGalaxies = self.getClusterGalaxies(clusterName)
-        # Find spectroscopic and photometric members seperately
-        # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
-        specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) < 0.02*(1+allClusterGalaxies['zspec'].values)
-        specZgalaxies = allClusterGalaxies[specZthreshold]
-        # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
-        photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) < 0.08*(1+allClusterGalaxies['zphot'].values)
-        photZgalaxies = allClusterGalaxies[photZthreshold]
-        # Remove photZgalaxies with a specZ
-        photZgalaxies = photZgalaxies[~photZgalaxies['cPHOTID'].isin(specZgalaxies['cPHOTID'])]
-        # Combine into a single DataFrame
-        memberGalaxies = specZgalaxies.append(photZgalaxies)
-        return memberGalaxies
-    # END GETMEMBERS
+        # Intialize column
+        self.catalog['member_adjusted'] = 0
+        # McNab+21 criteria: (zq_spec>=3) & (member==1) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)<0.16)
+        specZthreshold = (self.catalog['Redshift_Quality'] >= 3) & (self.catalog['member'] == 1) & (self.catalog['cluster_centric_distance_spec'] < 1000)
+        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) < 0.16) & (self.catalog['cluster_centric_distance_phot'] < 1000)
+        specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
+        # Establish reduced dataset of members
+        reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        # Update catalog
+        self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+    # END SETMEMBERS
 
-    def getNonMembers(self, clusterName:str) -> pd.DataFrame:
+    def setNonMembers(self) -> pd.DataFrame:
         """
-        getNonMembers Gets the non-member galaxies (field galaxies in the line of sight of the cluster, either in front of or behind it) 
-                   of a cluster based on the galaxy redshift with respect to the best estimate of the cluster redshift. 
-                   Spectroscopic members are those with (zspec-zclust) < 0.02(1+zspec) and photometric members are those with (zphot-zclust) < 0.08(1+zphot). 
-                   Thus the non-members will be the opposite.
+        setNonMembers Sets non-membership flag in the catalog based on criteria in McNab et. al. 2021
 
-        :param clusterName: Name of the cluster whose non-members should be returned
-        :return:            Pandas DataFrame containing the galaxies whose redshift match the membership requirements
+        :return:            catalog is updated
         """
-        allClusterGalaxies = self.getClusterGalaxies(clusterName)
-        memberGalaxies = self.getMembers(clusterName)
-        nonMemberGalaxies = allClusterGalaxies[~allClusterGalaxies['cPHOTID'].isin(memberGalaxies['cPHOTID'])]
-        return nonMemberGalaxies
-    # END GETNONMEMBERS
+        # Intialize column
+        self.catalog['nonmember_adjusted'] = 0
+        # McNab+21 criteria: ((zq_spec>=3) & (member==0) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)>=0.16))
+        specZthreshold = (self.catalog['Redshift_Quality'] >= 3) & ((self.catalog['member'] == 0) | (self.catalog['cluster_centric_distance_spec'] >= 1000))
+        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) >= 0.16) | (self.catalog['cluster_centric_distance_phot'] >= 1000)
+        specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
+        # Establish reduced dataset of members
+        reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        # Update catalog
+        self.catalog['nonmember_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
+    # END SETNONMEMBERS
 
-    def reduceDF(self, frame:pd.DataFrame, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
+    def setGoodData(self, additionalCriteria:list, useStandards:bool) -> pd.DataFrame:
         """
-        reduceDF Reduces the DataFrame param:frame to contain only galaxies that meet the criteria provided in
+        setGoodData Reduces the catalog to contain only galaxies that meet the criteria provided in
                  param:additionalCriteria and the standard criteria (if param:useStandards is True)
 
-        :param additionalCriteria: List of criteria to apply to param:frame
-        :param useStandards:       Flag to specify whether the standard criteria should be applied to param:frame
-        :return:                   Pandas DataFrame containing the galaxies whose values meet the criteria within param:additionalCriteria
-                                   and the standard criteria (if param:useStandards is True)
+        :param additionalCriteria: List of any criteria outside of standard to apply
+        :param useStandards:       Flag to specify whether the standard criteria should be applied
+        :return:                   Catalog is updated
         """
+        # Reinitialize quality flag in case standards have changed since last calling, or additional criteria are provided
+        self.catalog['goodData'] = 1
+        # Set quality flags to false as indicated by additional criteria
         if (additionalCriteria != None):
             for criteria in additionalCriteria:
-                frame = frame.query(criteria)
+                reduced = self.catalog.query(criteria)
+                self.catalog['goodData'] = self.catalog['goodData'] & (self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int))
+        # Set quality flags to false as indicated by standard criteria
         if useStandards:
             for criteria in self.standardCriteria:
-                frame = frame.query(criteria)
-        # Remove data points that would cause an error (it's not clear to me whether this is necessary. It seems as though standard criteria does not catch nan cases)
-        #frame = self.cutBadData(frame)
-        return frame
-    # END REDUCEDF
+                reduced = self.catalog.query(criteria)
+                self.catalog['goodData'] = self.catalog['goodData'] & (self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)) # https://www.geeksforgeeks.org/python-pandas-series-astype-to-convert-data-type-of-series/
+    # END SETGOODDATA
         
     def getClusterGalaxies(self, clusterName:str) -> pd.DataFrame:
         """
@@ -210,13 +281,13 @@ class GOGREEN:
         :param clusterName: Name of the cluster whose galaxies should be returned
         :return:            Pandas DataFrame containing only galaxies associated with cluster param:clusterName 
         """
-
         return self.catalog[self.catalog['Cluster'] == clusterName]
     # END GETCLUSTERGALAXIES
 
     def plotPassiveLines(self, axes:list=None, row:int=None, col:int=None):
         """
-        plotPassiveLines (private method) draws the recognized boundary between passive and star-forming galaxies on UVJ plots
+        plotPassiveLines Draws the recognized boundary between passive and star-forming galaxies on UVJ plots
+
         :param axes:                The array of subplots created when the plotType is set to 2.
                                      Default: None
         :param row :                Specifies the row of the 2D array of subplots. For use when axes is not None.
@@ -225,8 +296,7 @@ class GOGREEN:
                                      Default: None
         :return    :                lines are plotted
         """
-
-        # Generate the data used to plot the line
+        # Generate the data points used to plot the line
         x = [-5, 0.7, 1.6, 1.6]
         y = [1.3, 1.3, 2.2, 5]
         # In case of subplots, plot for the specific row and column
@@ -240,7 +310,7 @@ class GOGREEN:
 
     def plotVanDerWelLines(self, axes:list=None, row:int=None, col:int=None):
         """
-        plotVanDerWelLines plots the MSR line calculated in van der Wel et al. 2014
+        plotVanDerWelLines plots the passive and star-forming MSR trends calculated in van der Wel et al. 2014
 
         :param axes:                The array of subplots created when the plotType is set to 2.
                                      Default: None
@@ -250,53 +320,288 @@ class GOGREEN:
                                      Default: None
         :return    :                lines are plotted
         """
-        
         # Generate the data used to plot the line
-        logA = 0.7
-        alpha = 0.22
-        Mstellar = np.array([31622800000000000000000000, 3162280000000000000000000000])
-        Re = np.array([-1.5, 1.5])
-        xValues = np.array([alpha * np.log(i / (5 * np.float_power(10, 10))) for i in Mstellar])
-        #print(xValues)
+        Asf = pow(10, 0.7)
+        Apassive = pow(10, 0.22)
+        alphaSF = 0.22
+        alphaPassive = 0.76
+        xVals = np.array([9.8, 11.5])
+        MstellarRange = pow(10, xVals)
+        # Plug into equation
+        yValsPassive = np.log10(np.array([Apassive * pow((i / (5 * np.float_power(10, 10))), alphaPassive) for i in MstellarRange]))
+        yValsSF = np.log10(np.array([Asf * pow((i / (5 * np.float_power(10, 10))), alphaSF) for i in MstellarRange]))
         # In case of subplots, plot for the specific row and column
         if row != None and col != None:
             if axes[row][col] != None:
-                axes[row][col].plot(xValues, Re, linestyle='dashed', color='black')
+                axes[row][col].plot(xVals, yValsPassive, linestyle='dashed', color='red')
+                axes[row][col].plot(xVals, yValsSF, linestyle='dashed', color='blue')
                 return
         # Else plot normally
-        plt.plot(xValues, Re, linestyle='dashed', color='black')
+        plt.plot(xVals, yValsPassive, linestyle='dashed', color='red')
+        plt.plot(xVals, yValsSF, linestyle='dashed', color='blue')
     #END PLOTVANDERWELLINES
 
-    def reConvert(self, data:pd.DataFrame) -> tuple[list, list]:
+    def plotMcNabPlots(self):
         """
-        reConvert convert effective radius values from units of arcsec to kpc.
+        plotMcNabPlots plots two plots from McNab et. al. 2021
 
-        :param data:   The set of data being used by the calling function, plot().
-        :return   :    returns the list of converted effective radius values
+        :return    :     plots are plotted
+        """
+        # Establish appropriate standard criteria
+        searchCriteria = [
+            'Star == 0',
+            'K_flag < 4',
+            'Mstellar > 10**9.5',
+            '(1 < zspec < 1.5) or (((Redshift_Quality < 3) or (SPECID < 0)) and (1 < zphot < 1.5))',
+            'cluster_id <= 12'
+        ]
+        self.standardCriteria = searchCriteria
+        # Set data quality flags according to standard criteria
+        self.setGoodData(None, True)
+        print("Total phot sample: " + str(self.catalog.query('cluster_id <= 12 and zphot > 1 and zphot < 1.5 and K_flag >= 0 and K_flag < 4 and Star == 0 and Mstellar > 10**9.5').shape[0]) + " - expected: 3062")
+        print("Total spec sample: " + str(self.catalog.query('cluster_id <= 12 and zspec > 1 and zspec < 1.5 and Redshift_Quality >= 3 and Star == 0').shape[0]) + " - expected: 722")
+        print("Total spec sample (above mass limit): " + str(self.catalog.query('cluster_id <= 12 and cluster_id >= 1 and zspec > 1 and zspec < 1.5 and Redshift_Quality >= 3 and Star == 0 and Mstellar > 10**10.2').shape[0]) + " - expected: 342")
+        # Construct table
+        table = pd.DataFrame()
+        table['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
+        table['Total Sample'] = [self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and starForming == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and passive == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and greenValley == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and blueQuiescent == 1').shape[0], 
+            self.catalog.query('(member_adjusted == 1 or nonmember_adjusted == 1) and goodData == 1 and postStarBurst == 1').shape[0]]
+        table['Cluster Members'] = [self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1').shape[0], 
+            self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1').shape[0]]
+        expectedTable = pd.DataFrame()
+        expectedTable['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
+        expectedTable['Total Sample'] = [1302, 702, 257, 164, 54]
+        expectedTable['Cluster Members'] = [463, 504, 125, 106, 34]
+        diffTable = pd.DataFrame()
+        diffTable['Population'] = ['SF', 'Q', 'GV', 'BQ', 'PSB']
+        diffTable['Total Sample'] = table['Total Sample'] - expectedTable['Total Sample']
+        diffTable['Cluster Members'] = table['Cluster Members'] - expectedTable['Cluster Members']
+
+        # Display table
+        print("Table 2")
+        print(table)
+        print("Table 2 - Expected")
+        print(expectedTable)
+        print("Table 3 - Difference")
+        print(diffTable)
+        # Extract desired quantities from data for plot
+        # "Bad" populations refer to those before the spectroscopic mass threshold (to be displayed with smaller points)
+        passiveMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar <= 10**10.2')
+        starFormingMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar <= 10**10.2')
+        greenValleyMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar <= 10**10.2')
+        blueQuiescentMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar <= 10**10.2')
+        postStarBurstMembersBad = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar <= 10**10.2')
+
+        passiveMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and passive == 1 and Mstellar > 10**10.2')
+        starFormingMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and starForming == 1 and Mstellar > 10**10.2')
+        greenValleyMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and greenValley == 1 and Mstellar > 10**10.2')
+        blueQuiescentMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and blueQuiescent == 1 and Mstellar > 10**10.2')
+        postStarBurstMembersGood = self.catalog.query('member_adjusted == 1 and goodData == 1 and postStarBurst == 1 and Mstellar > 10**10.2')
+
+        # Construct plot 1
+        plt.figure()
+        # Plot "bad" data
+        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['NUVMINV'], alpha=0.5, s=8, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['NUVMINV'], alpha=0.5, s=8, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['NUVMINV'], alpha=0.5, s=8, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['NUVMINV'], alpha=0.5, s=30, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['NUVMINV'], alpha=0.5, s=30, marker='x', color='purple')
+        # Plot "good" data
+        plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['NUVMINV'], alpha=0.5, s=30, marker='o', color='red')
+        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['NUVMINV'], alpha=0.5, s=30, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['NUVMINV'], alpha=0.5, s=30, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['NUVMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['NUVMINV'], alpha=0.5, s=60, marker='x', color='purple', label='PSB')
+        # Indicate the green valley region
+        plt.plot([0.2, 2], [2, 5.5], linestyle='dashed', color='black')
+        plt.plot([0.2, 2], [1.5, 5], linestyle='dashed', color='black')
+        plt.fill_between([0.2, 2], [1.5, 5], [2, 5.5], color='green', alpha=0.1)
+        # Format plot 1
+        plt.xlabel("(V-J)")
+        plt.ylabel("(NUV-V)")
+        plt.xlim(0.2, 2)
+        plt.ylim(1, 6)
+        plt.title("Figure 1a")
+        plt.legend()
+
+        # Construct plot 2
+        plt.figure()
+        # Plot "bad" data
+        plt.scatter(passiveMembersBad['VMINJ'], passiveMembersBad['UMINV'], alpha=0.5, s=8, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['VMINJ'], starFormingMembersBad['UMINV'], alpha=0.5, s=8, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['VMINJ'], greenValleyMembersBad['UMINV'], alpha=0.5, s=30, marker='d', color='green')
+        plt.scatter(blueQuiescentMembersBad['VMINJ'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=8, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['VMINJ'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=30, marker='x', color='purple')
+        # Plot "good" data
+        plt.scatter(passiveMembersGood['VMINJ'], passiveMembersGood['UMINV'], alpha=0.5, s=30, marker='o', color='red', label='Q')
+        plt.scatter(starFormingMembersGood['VMINJ'], starFormingMembersGood['UMINV'], alpha=0.5, s=30, marker='*',  color='blue', label='SF')
+        plt.scatter(greenValleyMembersGood['VMINJ'], greenValleyMembersGood['UMINV'], alpha=0.5, s=60, marker='d', color='green', label='GV')
+        plt.scatter(blueQuiescentMembersGood['VMINJ'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=30, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersGood['VMINJ'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=60, marker='x', color='purple')
+        #xPoints = [0.3, 0.6, 0.7, 1]
+        #yPoints = [1.65, 1.95, 1.2, 1.45]
+        # Indicate the blue quiescent region
+        plt.plot([0.3, 0.6], [1.65, 1.95], linestyle='dashed', color='black') # top left
+        plt.plot([0.7, 1], [1.2, 1.45], linestyle='dashed', color='black') # bottom right
+        plt.plot([0.6, 1], [1.95, 1.45], linestyle='dashed', color='black') # top right
+        plt.plot([0.3, 0.7], [1.65, 1.2], linestyle='dashed', color='black') # bottom left
+        plt.fill_between([0.3, 0.6], [1.65, 1.3], [1.65, 1.95], color='orange', alpha=0.1)
+        plt.fill_between([0.7, 1], [1.2, 1.45], [1.85, 1.45], color='orange', alpha=0.1)
+        plt.fill_between([0.6, 0.7], [1.3, 1.2], [1.95, 1.85], color='orange', alpha=0.1)
+        # Format plot 2
+        plt.xlabel("(V-J)")
+        plt.ylabel("(U-V)")
+        plt.xlim(0.25, 2.25)
+        plt.ylim(0.5, 2.6)
+        plt.title("Figure 1b")
+        plt.legend()
+
+        # Construct plot 3
+        plt.figure()
+        # Plot "bad" data
+        plt.scatter(passiveMembersBad['D4000'], passiveMembersBad['UMINV'], alpha=0.5, s=8, marker='o', color='red')
+        plt.scatter(starFormingMembersBad['D4000'], starFormingMembersBad['UMINV'], alpha=0.5, s=8, marker='*',  color='blue')
+        plt.scatter(greenValleyMembersBad['D4000'], greenValleyMembersBad['UMINV'], alpha=0.5, s=8, marker='d', edgecolor='black', color='green')
+        plt.scatter(blueQuiescentMembersBad['D4000'], blueQuiescentMembersBad['UMINV'], alpha=0.5, s=30, marker='s', color='orange')
+        plt.scatter(postStarBurstMembersBad['D4000'], postStarBurstMembersBad['UMINV'], alpha=0.5, s=30, marker='x', edgecolor='black', color='purple')
+        # Plot "good" data
+        plt.scatter(passiveMembersGood['D4000'], passiveMembersGood['UMINV'], alpha=0.5, s=30, marker='o', color='red', label='Q')
+        plt.scatter(starFormingMembersGood['D4000'], starFormingMembersGood['UMINV'], alpha=0.5, s=30, marker='*',  color='blue', label='SF')
+        plt.scatter(greenValleyMembersGood['D4000'], greenValleyMembersGood['UMINV'], alpha=0.5, s=30, marker='d', edgecolor='black', color='green', label='GV')
+        plt.scatter(blueQuiescentMembersGood['D4000'], blueQuiescentMembersGood['UMINV'], alpha=0.5, s=60, marker='s', color='orange', label='BQ')
+        plt.scatter(postStarBurstMembersGood['D4000'], postStarBurstMembersGood['UMINV'], alpha=0.5, s=60, marker='x', edgecolor='black', color='purple', label='PSB')
+        # Format plot 3
+        plt.xlabel("D4000")
+        plt.ylabel("(U-V)")
+        plt.xlim(0.9, 2.2)
+        plt.ylim(0.5, 2.1)
+        plt.title("Figure 3")
+        plt.legend()
+    #END PLOTMCNABPLOTS
+
+    def setReErr(self):
+        """
+        Assign error values for Effective Radius (Re) measurements. These values are taken from van der Wel et. al. 2012, Table 3
+
+        :return   :    Catalog is updated
+        """
+        # Initialize to NaN
+        self.catalog['re_err_robust'] = np.nan
+        # Designate discrete error values corresponding to magnitude and effective radius (in arcseconds)
+        # We take a conservative estimate and assume all galaxies with magnitude brighter than 21 have the same error as those with a magnitude of 21
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) <= 21) & (self.catalog.re < 0.3), self.catalog.re*0.01, self.catalog.re_err_robust) #https://stackoverflow.com/questions/12307099/modifying-a-subset-of-rows-in-a-pandas-dataframe
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) <= 21) & (self.catalog.re > 0.3), self.catalog.re*0.01, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re < 0.3), self.catalog.re*0.02, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 22) & (self.catalog.re > 0.3), self.catalog.re*0.02, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re < 0.3), self.catalog.re*0.03, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 23) & (self.catalog.re > 0.3), self.catalog.re*0.06, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re < 0.3), self.catalog.re*0.08, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 24) & (self.catalog.re > 0.3), self.catalog.re*0.15, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re < 0.3), self.catalog.re*0.18, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 25) & (self.catalog.re > 0.3), self.catalog.re*0.33, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re < 0.3), self.catalog.re*0.42, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 26) & (self.catalog.re > 0.3), self.catalog.re*0.63, self.catalog.re_err_robust)
+        self.catalog['re_err_robust'] = np.where((np.round(self.catalog.mag) == 27) & (self.catalog.re < 0.3), self.catalog.re*0.76, self.catalog.re_err_robust)
+    #END SETREERR
+
+    def calcClusterCentricDist(self):
+        """
+        Assign cluster-centric distance values for all member galaxies
+
+        :return   :    Catalog is updated
+        """
+        # Initialize to NaN
+        self.catalog['cluster_z'] = np.nan
+        self.catalog['cluster_centric_distance_phot'] = np.nan
+        self.catalog['cluster_centric_distance_spec'] = np.nan
+        # Assign cluster RA and DEC values
+        structClusters = ['SpARCS0219', 'SpARCS0035','SpARCS1634', 'SpARCS1616', 'SPT0546', 'SpARCS1638',
+                                    'SPT0205', 'SPT2106', 'SpARCS1051', 'SpARCS0335', 'SpARCS1034']
+        cluster_Redshifts = []
+        # Add in cluster redshifts
+        for clusterName in structClusters:
+            cluster_Redshifts.append(float(self._clustersCatalog[self._clustersCatalog['cluster'] == clusterName].Redshift))
+        # Fill in cluster RA and DEC columns in catalog for ease of access
+        for i in range(0, len(structClusters)):
+            self.catalog['cluster_z'] = np.where(self.catalog.cluster == structClusters[i], cluster_Redshifts[i], self.catalog.cluster_z)
+        # Calculate cluster-centric distance for each member and fill in column
+        self.catalog['cluster_centric_distance_phot'] = self.ccd(self.catalog.ra, self.catalog.dec, self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z)
+        self.catalog['cluster_centric_distance_spec'] = self.ccd(self.catalog['RA(J2000)'].values, self.catalog['DEC(J2000)'], self.catalog.RA_Best, self.catalog.DEC_Best, self.catalog.cluster_z)
 
         """
-        if data['re'].values.shape == (0,):
-            # If there are no values, return empty array so attempting to convert does not cause a crash
-            return [], []
-        sizes = data['re'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60) #converting all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-        sigmas = data['re_err'].values * (cosmo.kpc_proper_per_arcmin(data['zspec'].values)/60)
-        for i in range(0, len(sizes)):
-            if np.isnan(sizes[i]): #checking where conversion failed due to lack of zspec value
-                sizes[i] = data['re'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-        for i in range(0, len(sigmas)):
-            if np.isnan(sigmas[i]): #checking where conversion failed due to lack of zspec value
-               sigmas[i] = data['re_err'].values[i] * (cosmo.kpc_proper_per_arcmin(data['zphot'].values[i])/60) #use photometric redshifts instead where there are no spectroscopic redshifts
-        sizes = (sizes / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        sigmas = (sigmas / u.kpc) * u.arcmin # removing units so the data can be used in the functions below
-        return sizes, sigmas
+        ccd Helper function called by calcClusterCentricDist()
+
+        :param gal_RA   :      Right ascension of each galaxy (in degrees)
+        :param clust_RA :      Right ascension of each galaxy's cluster (in degrees)
+        :param gal_DEC  :      Declination of each galaxy (in degrees)
+        :param clust_DEC:      Declination of each galaxy's cluster (in degrees)
+        :param clust_z  :      Redshift of each galaxy's cluster (z)
+        :param is_member:      Flag indicating whether the galaxy is a member of the cluster associated with it.
+                                Value: 1 - indicates true
+                                Value: 0 - indicates false
+        :return         :      Cluster-centric distance of each galaxy (in kpc)
+        """
+    def ccd(self, gal_RA, gal_DEC, clust_RA, clust_DEC, clust_z):
+        # Convert cluster dec to radians
+        clust_DEC_rad = clust_DEC * np.pi / 180
+        # Calculate cluster-centric distance in degrees
+        ccd_deg = np.sqrt(pow((gal_RA - clust_RA)*np.cos(clust_DEC_rad), 2) + pow(gal_DEC - clust_DEC, 2))
+        # Convert to arcmin
+        ccd_arcmin = ccd_deg*60
+        # Convert to kpc
+        ccd_arcmin_vals = ccd_arcmin.values
+        clust_z_vals = clust_z.values
+        ccd_kpc_vals = []
+        for i in range(0, len(ccd_arcmin_vals)):
+            if clust_z_vals[i] >= 0: # We avoid inputting NaN values to the conversion function
+                ccd_kpc_vals.append(ccd_arcmin_vals[i]*cosmo.kpc_proper_per_arcmin(clust_z_vals[i])) # Have to input single values to the conversion function
+                # Remove units
+                ccd_kpc_vals[i] = (ccd_kpc_vals[i] / u.kpc) * u.arcmin
+            else:
+                ccd_kpc_vals.append(np.NaN)
+        # Unsquare
+        return ccd_kpc_vals
+                                            
+
+    def reConvert(self):
+        """
+        reConvert Create new columns in the catalog for effective radius and its error in units of kpc.
+
+        :return   :    Catalog is updated
+
+        """
+        sizes =  self.catalog['re'].values
+        errs = self.catalog['re_err_robust'].values
+        length = len(sizes)
+        # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
+        sizes_converted = sizes * (cosmo.kpc_proper_per_arcmin(self.catalog['zspec'].values)/60)
+        errs_converted = errs * (cosmo.kpc_proper_per_arcmin(self.catalog['zspec'].values)/60)
+        # Try zphot values where conversion failed due to lack of zspec value
+        for i in range(0, length):
+            if np.isnan(sizes_converted[i]):
+                sizes_converted[i] = sizes[i] * (cosmo.kpc_proper_per_arcmin(self.catalog['zphot'].values[i])/60)
+            if np.isnan(errs_converted[i]):
+               errs_converted[i] = errs[i] * (cosmo.kpc_proper_per_arcmin(self.catalog['zphot'].values[i])/60)
+        # Remove units
+        sizes_converted = (sizes_converted / u.kpc) * u.arcmin
+        errs_converted = (errs_converted / u.kpc) * u.arcmin
+        # Add columns
+        self.catalog['re_converted'] = sizes_converted
+        self.catalog['re_err_robust_converted'] = errs_converted
     #END RECONVERT
 
-    def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, allData:bool=False, useMembers:str='only', additionalCriteria:list=None, useStandards:bool=True, typeRestrict:str=None, color:str='black'):
+    def MSRfit(self, data:list, useLog:list=[False, False], axes:list=None, row:int=None, col:int=None, typeRestrict:str=None, color:str=None, bootstrap:bool=True):
         """
         MSRfit fits a best fit line to data generated by the plot() method
 
         :param data:                The set of data that is relevant to the plot already generated by the plot() method
-        :param useLog:              Flag to indicate whether the x- or y-axis should be in log scale
+        :param useLog:              Flag to indicate whether the x- or y-axis should be in log scale (always determines whether fit is done in linear or log space)
                                      Default:   [False,False] - neither axis in log scale
                                      Value:   [False,True] - y axis in log scale
                                      Value:   [True,False] - x axis in log scale
@@ -307,119 +612,77 @@ class GOGREEN:
                                      Default: None
         :param col:                 Specifies the column of the 2D array of subplots. For use when axes is not None.
                                      Default: None
-        :param allData:             Flag to indicate whether all cluster data needs to be compiled in place of the data parameter.
-                                     Default: False
-        :param useMembers:        Flag to indicate whether only cluster members should be plotted or only non-members should be plotted.
-                                    Default: 'only' - only members
-                                    Value:   'not' - only non-members
-                                    Value:   'all' - no restriction imposed
-        :param additionalCriteria:  List of desired criteria the plotted galaxies should meet
-                                     Default: None
-        :param useStandards:        Flag to indicate whether the standard search criteria should be applied
+        :param typeRestrict:        Name indicating what population the trend is for, for use in constructing the label
+        :param color1:              The color the fit line should be.
+                                     Default: None     
+        :param bootstrap            Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
                                      Default: True
-        :param typeRestrict:        Flag to indicate whether data should be restricted based on SFR (only necessary when allData is True)
-                                     Default: None
-                                     Value:   'passive' - only passive galaxies should be considered.
-                                     Value:   'starForming' - only star forming galaxies should be considered.
-                                     Value:   'elliptical' - only galaxies with 2.5 < n < 6 should be considered.
-                                     Value:   'spiral' - only galaxies with n < 2.5 should be considered.
-        :param color1:             The color the fit line should be.
-                                    Default: 'black'       
         :return   :
 
         """
-        # If this function is called in a situation where galaxies in all clusters should be considered, it will handle the process of concatenating all of the data together prior to fitting.
-        # In this situation, the input value for 'data' is ignored.
-        if allData:
-            # Set an initial value to append to.
-            data = pd.DataFrame()
-            for clusterName  in self._structClusterNames:
-                if useMembers == 'only':
-                    # Get data for this cluster for galaxies classified as members
-                    data = data.append(self.getMembers(clusterName))
-                elif useMembers == 'not':
-                    # Get data for this cluster for galaxies classified as non-members
-                    data = data.append(self.getNonMembers(clusterName))
-                else:
-                    # Get data for this cluster for all galaxies
-                    data = data.append(self.getClusterGalaxies(clusterName))
-            # Apply other specified reducing constraints
-            data = self.reduceDF(data, additionalCriteria, useStandards)
-            # Handle case where only passive galaxies out of all data need to plotted.
-            if typeRestrict == 'passive':
-                data = data.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
-            # Handling case where only star forming galaxies out of all data need to plotted.
-            if typeRestrict == 'starForming':
-                data = data.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-            if typeRestrict == 'elliptical':
-                data = data.query('2.5 < n < 6')
-            # Handling case where only star forming galaxies out of all data need to plotted.
-            if typeRestrict == 'spiral':
-                data = data.query('n < 2.5')
-        # Convert all effective radii and associated errors from units of arcsec to kpc using their spectroscopic redshifts
-        size, sigmas = self.reConvert(data)
-        # Extract mass values
+        # Establish label
+        if typeRestrict == None:
+            lbl = "stellar mass-size relation trend"
+        else:
+            lbl = typeRestrict + " stellar mass-size relation trend"
+        # Extract values from data
+        size = data['re_converted'].values
         mass = data['Mstellar'].values
-        # Calculate coefficients (slope and y-intercept)
-        xFitData = mass
-        yFitData = size
-        if useLog[0] == True:
-            xFitData = np.log10(xFitData)
-        if useLog[1] == True:
-            yFitData = np.log10(yFitData)
-            upperSigmas = np.log10(size + sigmas) - np.log10(size)
-            lowerSigmas = np.log10(size) - np.log10(size - sigmas)
-            sigmas = (upperSigmas + lowerSigmas)/2
-        # Transform error values into weights
-        weights = 1/np.array(sigmas)
-        for i in range(0, len(weights)): # Explanation of the error that provoked this check: https://predictdb.org/post/2021/07/23/error-linalgerror-svd-did-not-converge/
-            if np.isinf(weights[i]):
-                weights[i] = 0 #setting to 0 because this data point should not be used
-            if np.isnan(weights[i]):
-                weights[i] = 0 #setting to 0 because this data point should not be used
-        s = np.polynomial.polynomial.Polynomial.fit(x=xFitData, y=yFitData, deg=1, w=weights) # I have no idea what rules this return value conforms to. the man page for fit() calls it a series. It is callable as a function. The syntax displayed is not familiar to me (x**1).
-        #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=xFitData, ydata=yFitData, p0=[0, 0], sigma=sigmas)
+        errs = data['re_err_robust_converted'].values
+        # Convert to fractional error
+        errs = errs/size
+        # Calculate coefficients using line-fitting algorithm
+        print(typeRestrict + " count: " + str(mass.shape[0]))
+        s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=mass, ydata=size, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber") 
+        slope = s[0]
+        intercept = s[1]
+        # Define x bounds
+        xBounds = np.array([9.8,11.5])
+        # Plot lines
         if row != None and col != None:
             # Check for subplots
             if axes[row][col] != None:
-                # Bootstrapping calculation
-                self.bootstrap(xFitData, yFitData, weights, axes, row, col)
+                if bootstrap:
+                    # Bootstrapping calculation
+                    self.bootstrap(mass, size, errs, axes, row, col, lineColor=color)
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
-                    axes[row][col].plot(xFitData, s(xFitData), color='white', linewidth=4)
+                    axes[row][col].plot(xBounds, intercept + slope*xBounds, color='white', linewidth=4)
                 # Plot the best fit line
-                axes[row][col].plot(xFitData, s(xFitData), color='red')
-                #axes[row][col].plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
+                axes[row][col].plot(xBounds, intercept + slope*xBounds, color=color, label=lbl)
                 return
-        # Bootstrapping calculation
-        self.bootstrap(xFitData, yFitData, weights, axes, row, col)
+        if bootstrap:
+            # Bootstrapping calculation
+            self.bootstrap(mass, size, errs, axes, row, col, lineColor=color)
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
-            plt.plot(xFitData, s(xFitData), color='white', linewidth=4)
+            plt.plot(xBounds, intercept + slope*xBounds, color='white', linewidth=4)
         # Plot the best fit line
-        plt.plot(xFitData, s(xFitData), color='red')
-        #plt.plot(xFitData, vals[0]+xFitData*vals[1], color='blue')
+        plt.plot(xBounds, intercept + slope*xBounds, color=color, label=lbl)
+        return slope, intercept
     # END MSRFIT
 
-    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None,):
+    def bootstrap(self, x:list=None, y:list=None, error:list=None, axes:list=None, row:int=None, col:int=None, lineColor:str=None):
         """
-        bootstrap obtains a measure of error of the line-fitting equation ...
+        bootstrap Obtains a measure of error of the line-fitting algorithm we use.
         
-        :param x     :    List containing the mass values of the data set
-                                Default: None
-        :param y     :    List containing the size values corresponding to each mass value in the data set
-                                Default: None
-        :param error:    List containing the error values corresponding to each size value in the data set
-                                Default: None
+        :param x:                   List containing the mass values of the data set
+                                     Default: None
+        :param y:                   List containing the size values corresponding to each mass value in the data set
+                                     Default: None
+        :param error:               List containing the error values corresponding to each size value in the data set
+                                     Default: None
         :param axes:                The array of subplots created when the plotType is set to 2.
                                      Default: None
         :param row:                 Specifies the row of the 2D array of subplots. For use when axes is not None.
                                      Default: None
         :param col:                 Specifies the column of the 2D array of subplots. For use when axes is not None.
                                      Default: None
-        :return      :    ...
+        :param lineColor:           Flag to indicate what color should be used to accentuate the trendline.
+                                     Default: None
+        :return      :    bootstrap uncertainty region is plotted.
         """
-        # Establish type of plot
+        # Initialize type of plot
         plot = plt
         # Check for subplots
         if row != None and col != None:
@@ -430,8 +693,8 @@ class GOGREEN:
         rng = np.random.RandomState(1234567890) # reference: https://stackoverflow.com/questions/5836335/consistently-create-same-random-numpy-array
         # Initialize arrays
         size = len(x)
-        xMin = np.min(x)
-        xMax = np.max(x)
+        xMin = np.log10(np.min(x))
+        xMax = np.log10(np.max(x))
         slopes = np.empty((100,))
         intercepts = np.empty((100,))
         # Create 100 bootstrap lines
@@ -444,21 +707,19 @@ class GOGREEN:
                 bootstrapX = x[randIndices]
                 bootstrapY = y[randIndices]
                 boostrapE = error[randIndices]
-                # Fit data with equation
+                # Fit data with equation (in try-catch block to help detect errors)
                 try:
-                    #vals, cov = opt.curve_fit(f=(lambda x, m, b: b + m*x), xdata=bootstrapX, ydata=bootstrapY, p0=[0, 0], sigma=boostrapE)
-                    s = np.polynomial.polynomial.Polynomial.fit(x=bootstrapX, y=bootstrapY, deg=1, w=boostrapE)
-                    coefs = s.convert().coef
-                    b = coefs[0]
-                    m = coefs[1]
+                    # Calculate coefficients for a bootstrap line
+                    s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=bootstrapX, ydata=bootstrapY, sigma=boostrapE, bounds=([-10, -10], [10, 10]), loss="huber")
+                    m = s[0]
+                    b = s[1]
                     # Store coefficients
                     intercepts[i] = b
                     slopes[i] = m
-                    # Calculate outputs
-                    xline = np.array([xMin, xMax])
-                    yline = b + m*xline # Equivalent operation: yline = s(xline)
-                    # Plot curve
-                    plot.plot(xline, yline, color='green')
+                    # Uncomment to plot each bootstrap line.
+                    #xline = np.array([xMin, xMax])
+                    #yline = b + m*xline
+                    #plot.plot(xline, yline, color='green', alpha=0.6)
                     plotted = True
                 except RuntimeError:
                     print("caught runtime error")
@@ -479,112 +740,98 @@ class GOGREEN:
             # Calculate 68% confidence interval for the ith grid coordinate
             yTops[i] = np.percentile(yGrid[i], 84)
             yBots[i] = np.percentile(yGrid[i], 16)
+        # Determine color to be used
+        # Useful tool: https://www.rapidtables.com/web/color/RGB_Color.html
+        if lineColor == 'red':
+            color = [0.5, 0, 0] # darker red
+        elif lineColor == 'green':
+            color = [0, 0.5, 0] # darker green
+        elif lineColor == 'orange':
+            color = [1, 0.8, 0.8] # pinkish
+        elif lineColor == 'yellow':
+            color = [1, 1, 0.8] # lighter yellow
+        elif lineColor == 'purple':
+            color = [0.8, 0.6, 1] # lighter purple
+        # star-forming and default case
+        else:
+            color = [0, 0, 0.5] # darker blue
         # Plot curves on top and bottom of intervals
-        plot.plot(xGrid, yTops, color='blue')
-        plot.plot(xGrid, yBots, color='blue')
-        plot.fill_between(xGrid, yBots, yTops) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
+        plot.plot(xGrid, yTops, color=color)
+        plot.plot(xGrid, yBots, color=color)
+        # Fill in region
+        plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
     # END BOOTSTRAP
 
-    def cutBadData(self, data:pd.DataFrame) -> pd.DataFrame:
-        """
-        cutBadData removes all data points from a data set for which the mass value is missing
+    def evalLineFit(self):
+        # y = 1.213x - 2.44
+        m = 1.213
+        b = -2.44
+        rng = np.random.RandomState(1234567890)
+        randXLine = 9.8 + rng.random()*2.7
+        yLine = m*randXLine + b
+        randUnc = rng.random()/2
+        nFake = []
+        for i in range(0, 100):
+            yFake = rng.normal(loc=yLine, scale=randUnc)
+            nFake.append((randXLine, yFake, yFake*randUnc))
+        s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=nFake[0], ydata=nFake[1], sigma=nFake[2], bounds=([-10, -10], [10, 10]), loss="huber") 
+        slope = s[0]
+        intercept = s[1]
+        print((slope, intercept))
+    # END EVALLINEFIT
         
-        :param masses    :     List containing the mass values of the data set
-                                Default: None
-        :param sizes    :      List containing the size values corresponding to each mass in the data set
-                                Default: None
-        :return: masses and sizes are returned minus the bad data points
-        """
-        badDataIndices = []
-        for i in range(0, len(data['Mstellar'])):
-            # Check if there are any remaining missing values (in the rare case where there is no Mstellar value, no re value, or there are no redshift values)
-            if np.isnan(data['Mstellar'].values[i]) or np.isnan(data['re'].values[i]) or (np.isnan(data['zspec'].values[i]) and np.isnan(data['zphot'].values[i])):
-                # Add the index of this data point to the list of those to be removed once all data points have been checked.
-                badDataIndices.append(i)
-        for j in range(len(badDataIndices) - 1, -1, -1):
-            # Iterate through the array of indices, removing the data at these indices from both axis arrays.
-            data = pd.concat([data[:badDataIndices[j]], data[badDataIndices[j]+1:]])
-        return data
 
-    def getRatio(self, category:str='SF', x:float=None, y:float=None, plotLines:bool=False, xRange:list=None, yRange:list=None) -> list:
+    def compTrends(self, x:float=None, y:float=None, bootstrap:bool=True, limitRange:bool=True, plotType:str="default") -> tuple:
         """
-        Calculates the ratio of member over non-member galaxies (for both passive and star-forming). Also has an option to plot the trendlines for these 4 categories
-
-        :param category:    Name of the category to consider when making comparisons
-                             Default: 'SF' - indicates passive vs star-forming should be compared
+        compTrends Calculates the ratio of member over non-member galaxies and plots relevant trendlines.
         :param x:           X value at which the comparison should be made
                              Default: None
         :param y:           Y value at which the comparison should be made
                              Default: None
-        :param plotLines:  
-        :param xRange:     List containing the desired lower and upper bounds for the x-axis
-                            Default: None
-        :param yRange:     List containing the desired lower and upper bounds for the y-axis
-                            Default: None
-        :return: size 2 list of the two ratios of member over non-member galaxies (first element is for quiescent, second is for star-forming)
+        :param limitRange:  Flag to indicate whether the plot should be restricted to x = [9.8, 11.5] and y = [-0.75, 1.25]
+                             Default: True
+        :param plotType:    Determines specific behavior of the function
+                             Value: "default" - quiescent and star-forming ratios are calculated separately
+                             Value: "transition" - transition lines are plotted as well
+                             Value: "lit" - whole population's ratio is calculated and compared to the literature.
+        :return: tuple of up to two distinct population ratios of member over non-member galaxies, plus between 2 and 7 trendlines are plotted
         """
-        # Set an initial value to append to.
-        memberData = pd.DataFrame()
-        nonMemberData = pd.DataFrame()
-        for clusterName  in self._structClusterNames:
-            # Get data for this cluster for galaxies classified as members
-            memberData = memberData.append(self.getMembers(clusterName))
-            nonMemberData = nonMemberData.append(self.getNonMembers(clusterName))
-        # Apply other specified reducing constraints
-        memberData = self.reduceDF(memberData, None, True)
-        nonMemberData = self.reduceDF(nonMemberData, None, True)
-        # Handle case where only passive galaxies out of all data need to plotted.
-        if category == 'SF':
-            # Separate data sets by SFR
-            memberDataQ = memberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
-            memberDataSF = memberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-            nonMemberDataQ = nonMemberData.query('(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)')
-            nonMemberDataSF = nonMemberData.query('(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)')
-            # Convert all effective radii from units of arcsec to kpc using their spectroscopic redshifts
-            memberSizeQ = self.reConvert(memberDataQ)
-            memberSizeSF = self.reConvert(memberDataSF)
-            nonMemberSizeQ = self.reConvert(nonMemberDataQ)
-            nonMemberSizeSF = self.reConvert(nonMemberDataSF)
-            # Extract all mass values
-            memberMassQ = memberDataQ['Mstellar'].values
-            memberMassSF = memberDataSF['Mstellar'].values
-            nonMemberMassQ = nonMemberDataQ['Mstellar'].values
-            nonMemberMassSF = nonMemberDataSF['Mstellar'].values
-            # Cut out data points that will cause an error
-            memberMassQ, memberSizeQ = self.cutBadData(memberMassQ, memberSizeQ)
-            memberMassSF, memberSizeSF = self.cutBadData(memberMassSF, memberSizeSF)
-            nonMemberMassQ, nonMemberSizeQ = self.cutBadData(nonMemberMassQ, nonMemberSizeQ)
-            nonMemberMassSF, nonMemberSizeSF = self.cutBadData(nonMemberMassSF, nonMemberSizeSF)
-            # Convert to log
-            memberMassQ = np.log10(memberMassQ)
-            memberSizeQ = np.log10(memberSizeQ)
-            memberMassSF = np.log10(memberMassSF)
-            memberSizeSF = np.log10(memberSizeSF)
-            nonMemberMassQ = np.log10(nonMemberMassQ)
-            nonMemberSizeQ = np.log10(nonMemberSizeQ)
-            nonMemberMassSF = np.log10(nonMemberMassSF)
-            nonMemberSizeSF = np.log10(nonMemberSizeSF)
-            # Calculate slope and intercept for all 4 data sets
-            mMemberQ, bMemberQ = np.polyfit(memberMassQ, memberSizeQ, 1)
-            mMemberSF, bMemberSF = np.polyfit(memberMassSF, memberSizeSF, 1)
-            mNonMemberQ, bNonMemberQ = np.polyfit(nonMemberMassQ, nonMemberSizeQ, 1)
-            mNonMemberSF, bNonMemberSF = np.polyfit(nonMemberMassSF, nonMemberSizeSF, 1)
-            # Plot trendlines together
-            if plotLines:
-                plt.plot(memberMassQ, mMemberQ * memberMassQ + bMemberQ, label='quiescent members')
-                plt.plot(memberMassSF, mMemberSF * memberMassSF + bMemberSF, label='star-forming members')
-                plt.plot(nonMemberMassQ, mNonMemberQ * nonMemberMassQ + bNonMemberQ, label='quiescent non-members')
-                plt.plot(nonMemberMassSF, mNonMemberSF * nonMemberMassSF + bNonMemberSF, label='star-forming non-members')
-                plt.legend()
-                if xRange != None:
-                    if len(xRange) > 1:
-                        plt.xlim(xRange[0], xRange[1])
-                if yRange != None:
-                    if len(yRange) > 1:
-                        plt.ylim(yRange[0], yRange[1])
-                plt.xlabel('log(Mstellar)')
-                plt.ylabel('log(Re)')
-            if x != None:
+        # Adjust plot size
+        plt.figure(figsize=(10,10))
+        # Reduce according to standard criteria
+        self.setGoodData(None, True)
+        # Quiescent and star-forming trends for default or transition option
+        if plotType == "default" or plotType == "transition":
+            passiveMembers = self.catalog.query('member_adjusted == 1 and passive == 1 and goodData == 1')
+            passiveNonMembers = self.catalog.query('nonmember_adjusted == 1 and passive == 1 and goodData == 1')
+            starFormingMembers = self.catalog.query('member_adjusted == 1 and starForming == 1 and goodData == 1')
+            starFormingNonMembers = self.catalog.query('nonmember_adjusted == 1 and starForming == 1 and goodData == 1')
+            # Plot quiescent and sf trends for members and nonmembers (4 lines total)
+            mMemberQ, bMemberQ = self.MSRfit(data=passiveMembers, useLog=[True, True], typeRestrict='Quiescent cluster', color='red', bootstrap=bootstrap)
+            mMemberSF, bMemberSF = self.MSRfit(data=starFormingMembers, useLog=[True, True], typeRestrict='Star-Forming cluster', color='blue', bootstrap=bootstrap)
+            mNonMemberQ, bNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent field', color='orange', bootstrap=bootstrap)
+            mNonMemberSF, bNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
+        # Transition galaxy option
+        if plotType == "transition":
+            # Extracted desired quantities from data
+            gvMembers = self.catalog.query('member_adjusted == 1 and greenValley == 1 and goodData == 1')
+            gvNonMembers = self.catalog.query('nonmember_adjusted == 1 and greenValley == 1 and goodData == 1')
+            bqMembers = self.catalog.query('member_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
+            bqNonMembers = self.catalog.query('nonmember_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
+            psbMembers = self.catalog.query('member_adjusted == 1 and postStarBurst == 1 and goodData == 1')
+            psbNonMembers = self.catalog.query('nonmember_adjusted == 1 and postStarBurst == 1 and goodData == 1')
+            # Plot trends (6 additional lines)
+            _, _ = self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV cluster', color='purple', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV field', color='pink', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=bqMembers, useLog=[True, True], typeRestrict='BQ cluster', color='black', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=bqNonMembers, useLog=[True, True], typeRestrict='BQ field', color='gray', bootstrap=bootstrap)
+            _, _ = self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB cluster', color='brown', bootstrap=bootstrap)
+            # Not plotting psbNonMembers because it will crash due to there being too few data points.
+            #_, _ = self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB field', color='yellow', bootstrap=bootstrap)
+        # Ratio calculation for default or transition option
+        if plotType == "default" or plotType == "transition":
+            # if x or y values are provided, return ratio at that value
+            if x != None and y == None:
                 # Get ratios at a certain x value
                 pointMemberQ = x*mMemberQ + bMemberQ
                 pointMemberSF = x*mMemberSF + bMemberSF 
@@ -592,8 +839,7 @@ class GOGREEN:
                 pointNonMemberSF = x*mNonMemberSF + bNonMemberSF
                 ratioQ = pointMemberQ/pointNonMemberQ
                 ratioSF = pointMemberSF/pointNonMemberSF
-                return [ratioQ, ratioSF]
-            elif y != None:
+            elif y != None and x == None:
                 # Get ratios at a certain y value
                 pointMemberQ = (y/mMemberQ) - (bMemberQ/mMemberQ)
                 pointMemberSF = (y/mMemberSF) - (bMemberSF/mMemberSF)
@@ -601,20 +847,74 @@ class GOGREEN:
                 pointNonMemberSF = (y/mNonMemberSF) - (bNonMemberSF/mNonMemberSF) 
                 ratioQ = pointMemberQ/pointNonMemberQ
                 ratioSF = pointMemberSF/pointNonMemberSF
-                return [ratioQ, ratioSF]
+            # Error cases
+            elif x != None and y != None:
+                print("Error: Both x and y values were provided. Please provide only one.")
+                return (np.nan, np.nan)    
             else:
-                print("No point of comparison provided")
-                return [-1]     
-        else:
-            print(category + " is not a valid category")
-            return [-1]
+                print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
+                return (np.nan, np.nan)  
+            # Format plot
+            if limitRange:
+                plt.xlim(9.8, 11.5)
+                plt.ylim(-0.75, 1.25)
+            plt.legend() 
+            # Return a tuple containing the ratios
+            return (ratioQ, ratioSF)
+        # Ratio calculation for lit option
+        if plotType == "lit":
+            members = self.catalog.query('member_adjusted == 1 and goodData == 1')
+            nonMembers = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
+            mMember, bMember = self.MSRfit(data=members, useLog=[True, True], typeRestrict='cluster', color="orange", bootstrap=bootstrap)
+            mNonMember, bNonMember = self.MSRfit(data=nonMembers, useLog=[True, True], typeRestrict='field', color="green", bootstrap=bootstrap)
+            # if x or y values are provided, return ratio at that value
+            if x != None and y == None:
+                # Get ratios at a certain x value
+                pointMember = x*mMember + bMember
+                pointNonMember = x*mNonMember + bNonMember
+                ratio = pointMember/pointNonMember
+                diff = pointMember - pointNonMember
+            elif y != None and x == None:
+                # Get ratios at a certain y value
+                pointMember = (y/mMember) - (bMemberQ/mMember)
+                pointNonMember = (y/mNonMember) - (bNonMember/mNonMember) 
+                ratio = pointMember/pointNonMember
+                diff = pointMember - pointNonMember
+            # Error cases
+            elif x != None and y != None:
+                print("Error: Both x and y values were provided. Please provide only one.")
+                return (np.nan, np.nan)     
+            else:
+                print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
+                return (np.nan, np.nan) 
+            # Format plot
+            if limitRange:
+                plt.xlim(9.8, 11.5)
+                plt.ylim(-0.75, 1.25)
+            plt.legend()
+            # Construct lit comparison plot
+            plt.figure()
+            # Cooper+12 measured ~0.1 at redshift ~0.8
+            plt.scatter(0.8, 0.1, label="Cooper+12")
+            # Cooper+12 measured ~0.1 at redshift ~1.3
+            plt.scatter(0.8, 0.1, label="Raichoor+12")
+            # Currently estimating our redshift to be at 1.25
+            plt.scatter(1.25, diff, label="Our measurement")
+            plt.xlabel("Redshift")
+            plt.ylabel("Dlog Re (cluster - field)")
+            plt.xlim(0, 2.5)
+            plt.ylim(-0.2, 0.35)
+            plt.legend()
+            # Return our ratio and a nan value in the second slot in case this is incorrectly accessed
+            return (ratio, np.nan)  
     #END GETRATIO
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
         """
-        Plots the median in four mass bins, including uncertainty and standard error on the median
+        Plots the median in four mass bins, including uncertainty and standard error on the median (THIS FUNCTION IS OUTDATED AND NEEDS TO BE REWORKED)
 
         :param category  :     Name of the category to consider when making comparisons
+                                Default: SF
         :param xRange    :     List containing the desired lower and upper bounds for the x-axis
                                 Default: None
         :param yRange    :     List containing the desired lower and upper bounds for the y-axis
@@ -708,7 +1008,7 @@ class GOGREEN:
 
     def plotStdError(self, median:int=None, bin:int=None, stdError:int=None, color:str=None):
         """
-        plotStdError plots error bars for the standard error of the median
+        plotStdError plots error bars for the standard error of a median
         
         :param median :     the median size value
                                 Default: None
@@ -746,7 +1046,7 @@ class GOGREEN:
 
     def makeTable(self, filename):
         """
-        Generates a table of slope and intercept values of best fit lines of all, passive, and star forming galaxies in each cluster
+        Generates a table of slope and intercept values of best fit lines of all, passive, and star forming galaxies in each cluster  (THIS FUNCTION IS OUTDATED AND NEEDS TO BE REWORKED)
 
         :param : filename - the name of the file to write to
         :return: writes slopes and y-intercepts to the file 'output.txt'
@@ -783,7 +1083,7 @@ class GOGREEN:
         """
         Helper function for use by makeTable()
         
-        :param : data - Pandas data frame correlating to one cluster. May be the entirety of the data for the cluster (after standard criteria have been applied)
+        :param : data - Pandas data frame correlating to one cluster. May be the entirety of the data for the cluster (after standard criteria have been applied)  (THIS FUNCTION IS OUTDATED AND NEEDS TO BE REWORKED)
                         May also be only the data for passive or star forming galaxies.
         :param : f - the file to write to (assumes file is open)
         :return: writes slope and intercept of best fit line for the data to output.txt.
@@ -803,35 +1103,107 @@ class GOGREEN:
     # END MAKETABLE
 
     def testPlots(self):
+        """
+        Makes a series of test plots, stores and analyzes the data counts resulting from each plot to judge the accuracy of the plot() function.
+
+        :return: counts are written to file C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt
+        """
+        # Establish criteria
         searchCriteria = [
             'Star == 0',
             'K_flag == 0',
+            'Mstellar > 10**9.8',
+            '(1 < zspec < 1.5) or ((((Redshift_Quality != 3) and (Redshift_Quality != 4)) or (SPECID < 0)) and (1 < zphot < 1.5))',
+            'cluster_id <= 12',
             'totmask == 0',
-            're > 0',
-            'Mstellar > 6300000000',
-            'Fit_flag > 1',
+            'Fit_flag > 2',
             'n < 6',
             'HSTFOV_flag == 1',
-            '(1 < zspec < 1.5) or ((Redshift_Quality != 3) and (Redshift_Quality != 4) and (1 < zphot < 1.5))'
+            're > 0'
         ]
         self.standardCriteria = searchCriteria
 
         with warnings.catch_warnings(): #suppressing depracation warnings for readability purposes
             warnings.simplefilter("ignore")
             warnings.warn("deprecated", DeprecationWarning)
-            
+            # Open file for writing
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'w')
+            # Establish variables for first test
             memberStatus = ["all", "only", "not"]
             plotType = [1, 2, 3]
             colorType = [None, "membership", "passive", "sersic"]
-            cluster = None
+            # Plot MSR and UVJ plots for each variable
             for m in memberStatus:
                 for p in plotType:
                     for c in colorType:
                         if p == 1:
                             cluster = "SpARCS1616"
-                        self.plot('Mstellar', 're', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [7.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False, test=True, file=f)
-                        self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False, test=True, file=f)
+                        else:
+                            cluster = None
+                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xACountUVJ, xBCountUVJ, yACountUVJ, yBCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
+                        # End test early (and with specific error) if major discrepency is found
+                        if xACountMSR != yACountMSR or xACountUVJ != yACountUVJ or xBCountMSR != yBCountMSR or xBCountUVJ != yBCountUVJ:
+                            print("test failed. X and Y data counts do not agree.")
+                            return
+                        if xACountMSR != xACountUVJ:
+                            print("test failed. stellar mass-size relation and UVJ counts do not agree.")
+                            return
+                        # Write A count
+                        f.write('(' + str(xACountMSR) + ', ')
+                        # Write B count
+                        f.write(str(xBCountMSR) + ') ')
+            # Establish variables for second test
+            clusterNames = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
+            xATot = 0
+            xBTot = 0
+            # Seperate results with newline
+            f.write('\n')
+            # Plot MSR plot for each cluster
+            for cluster in clusterNames:
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                # Write A count
+                f.write('(' + str(xACount) + ', ')
+                # Write B count
+                f.write(str(xBCount) + ') ')
+                # Add value to total
+                xATot+=xACount
+                xBTot+=xBCount
+            # Write total count on another newline
+            f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
+            # Plot MSR plot for all clusters combined
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            # Write expected total
+            f.write(str(xATotExpected))
+            f.write(str(xBTotExpected))
+            if xATot != xATotExpected or xBTot != xBTotExpected:
+                print("test failed. Totaled Individual and combined cluster counts do not agree.")
+                return
+            # Establish variables for third test
+            clusterNames = ["SpARCS0219", "SpARCS0035", "SpARCS1634", "SpARCS1616", "SPT0546", "SpARCS1638", "SPT0205", "SPT2106", "SpARCS1051", "SpARCS0335", "SpARCS1034"]
+            xATot = 0
+            xBTot = 0
+            # Seperate results with newline
+            f.write('\n')
+            # Plot MSR plot for each cluster
+            for cluster in clusterNames:
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                # Write A count
+                f.write('(' + str(xACount) + ', ')
+                # Write B count
+                f.write(str(xBCount) + ') ')
+                # Add value to total
+                xATot+=xACount
+                xBTot+=xBCount
+            # Write total count on another newline
+            f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
+            # Plot MSR plot for all clusters combined
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            # Write expected total
+            f.write('(' + str(xATot) + ', ' + str(xBTot) + ') ')
+            if xATot != xATotExpected or xBTot != xBTotExpected:
+                print("test failed. Totaled Individual and combined field counts do not agree.")
+                return
             f.close()
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'r')
             testOutput = f.read()
@@ -839,14 +1211,207 @@ class GOGREEN:
             f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/truth.txt', 'r')
             expectedOutput = f.read()
             f.close()
+            # Print result
             if testOutput == expectedOutput:
                 print("test passed.")
                 return
-            print("test failed.")
+            print("test failed due to unspecified error case.")
     # END TEST
+    
+    def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, colorType:str=None, useLog:list=[False,False], fitLine:bool=False, additionalCriteria:list=None, useStandards:bool=False,
+        color1:list=None, color2:list=None, plot=None, axes:list=None, row:int=None, col:int=None, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
+            """
+            Helper function called by plot(). Handles the plotting of data.
+                
+            :param xQuantityName:      Name of the column whose values are to be used as the x
+            :param yQuantityName:      Name of the column whose values are to be used as the y
+            :param colorType:          Specifies how to color code the plotted galaxies
+                                        Default: None
+                                        Value:   'membership' - spectroscopic member vs photometric member
+                                        Value:   'passive' - passive vs star forming
+            :param useLog:             Flag to indicate whether the x- or y-axis should be in log scale
+                                        Default: [False,False] - neither axis in log scale
+                                        Value:   [False,True] - y axis in log scale
+                                        Value:   [True,False] - x axis in log scale
+                                        Value:   [True,True] - both axis in log scale
+            :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass.
+                                        Default: False 
+            :param additionalCriteria: List of desired criteria the plotted galaxies should meet
+                                        Default: None
+            :param data:               Set of data points to be plotted. 
+            :param color1:             Specifies what color should be used when plotting first type of data
+                                        Value:   (r,g,b)
+            :param color2:             Specifies what color should be used when plotting first type of data
+                                        (note: unused when colorType is None)
+                                        Value:   (r,g,b)
+            :param plot:               The plot on which the data should be plotted.
+                                        Value: will be either the module 'plt' or a subplot
+            :param axes:               The array of subplots created when the plotType is set to 2.
+                                        Default: None
+            :param row:                Specifies the row of the 2D array of subplots. For use when axes is not None.
+                                        Default: None
+            :param col:                Specifies the column of the 2D array of subplots. For use when axes is not None.
+                                        Default: None
+            :param bootstrap           Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
+                                        Default: True
+            :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted
+                                        Default: False
+            :param plotTransitionType  Flag to indicate whether individual galaxies should have their Re error plotted
+                                        Default: None
+                                        Value: GV - plot green valley trend
+                                        Value: BQ - plot blue quiescent trend    
+                                        Value: PSB - plot post-starburst trend   
+            :return:                   (xA, xB, yA, yB), representing the total number of x-values and y-values corresponding to plotted data points of two different populations. Generated plot is displayed.
+            """
+            print(additionalCriteria)
+            # Create 'goodData' flag for future checks
+            self.setGoodData(additionalCriteria, useStandards)
+            # Arbitrary establishment of variables for non-coloring case
+            aData = self.catalog.query('goodData == 1')
+            bData = self.catalog.query('goodData == 1')
+            aLbl = None
+            bLbl = None
+            # Overwrite variables according to coloring scheme
+            if colorType == None:
+                # Don't need to do anything for this case. Included so program proceeds as normal
+                pass
+            elif colorType == 'membership':
+                aData = self.catalog.query('spectroscopic == 1 and goodData == 1')
+                aLbl = 'Spectroscopic z'
+                bData = self.catalog.query('photometric == 1 and goodData == 1')
+                bLbl = 'Photometric z'
+            elif colorType == 'passive':
+                aData = self.catalog.query('passive == 1 and goodData == 1')
+                aLbl = 'Quiescent'
+                bData = self.catalog.query('starForming == 1 and goodData == 1')
+                bLbl = 'Star Forming'
+            elif colorType == 'GV':
+                aData = self.catalog.query('greenValley == 1 and goodData == 1')
+                aLbl = 'Green Valley'
+                bData = self.catalog.query('greenValley == 0 and goodData == 1')
+                bLbl = 'Other'
+            elif colorType == 'BQ':
+                aData = self.catalog.query('blueQuiescent == 1 and goodData == 1')
+                aLbl = 'Blue Quiescent'
+                bData = self.catalog.query('blueQuiescent == 0 and goodData == 1')
+                bLbl = 'Other'
+            elif colorType == 'PSB': 
+                aData = self.catalog.query('postStarBurst == 1 and goodData == 1')
+                aLbl = 'Post-starburst'
+                bData = self.catalog.query('postStarBurst == 0 and goodData == 1')
+                bLbl = 'Other' 
+            elif colorType == 'sersic':
+                aData = self.catalog.query('elliptical == 1 and goodData == 1')
+                aLbl = 'Elliptical'
+                bData = self.catalog.query('spiral == 1 and goodData == 1')
+                bLbl = 'Spiral'
+            elif colorType == 'membership':
+                aData = self.catalog.query('member_adjusted == 1 and goodData == 1')
+                aLbl = 'Cluster'
+                bData = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
+                bLbl = 'Field'
+            else:
+                print(colorType, ' is not a valid coloring scheme!')
+                return
+            # Code for plotting transition population trends, like in Matharu+20
+            if plotTransitionType == 'GV':
+                cData = self.catalog.query('greenValley == 1 and goodData == 1')
+                cLbl = 'Green Valley'
+                cColor = "green"
+            elif plotTransitionType == 'BQ':
+                cData = self.catalog.query('blueQuiescent == 1 and goodData == 1')
+                cLbl = 'Blue Quiescent'
+                cColor = "black"
+            elif plotTransitionType == 'PSB':
+                cData = self.catalog.query('postStarBurst == 1 and goodData == 1')
+                cLbl = 'Post-starburst'
+                cColor = "black"
+            aXVals = aData[xQuantityName].values
+            bXVals = bData[xQuantityName].values
+            aYVals = aData[yQuantityName].values
+            bYVals = bData[yQuantityName].values
+            # Check if either axis needs to be put in log scale
+            if useLog[0] == True:
+                aXVals = np.log10(aXVals)
+                bXVals = np.log10(bXVals)
+            if useLog[1] == True:
+                aYVals = np.log10(aYVals)
+                bYVals = np.log10(bYVals)
+            # Plot passive v star-forming border in the case where we are plotting UVJ color-color
+            if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
+                self.plotPassiveLines(axes, row, col)
+            # generate best fit line
+            if fitLine:
+                # Generate two if plotting two distinct categories
+                if colorType != None:
+                    self.MSRfit(aData, useLog, axes, row, col, typeRestrict=aLbl, color=color1, bootstrap=bootstrap)
+                    self.MSRfit(bData, useLog, axes, row, col, color=color2, typeRestrict=bLbl, bootstrap=bootstrap)
+                else:
+                    #print(aData.shape)
+                    self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
+            # Generate the plot
+            plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
+            # Generate a third line and color in transition data if plotting a transition type
+            if plotTransitionType != None:
+                self.MSRfit(cData, useLog, axes, row, col, typeRestrict=cLbl, color=cColor, bootstrap=bootstrap)
+                cXVals = cData[xQuantityName].values
+                cYVals = cData[yQuantityName].values
+                if useLog[0] == True:
+                    cXVals = np.log10(cXVals)
+                if useLog[1] == True:
+                    cYVals = np.log10(cYVals)
+                plot.scatter(cXVals, cYVals, alpha=0.5, s=70, marker=mrk.MarkerStyle(marker='s', fillstyle='none'), color=cColor)
+            if plotErrBars:
+                # Extract error values
+                if yQuantityName == 're':
+                    aYsigmas = aData['re_err_robust'].values
+                    bYsigmas = bData['re_err_robust'].values
+                elif yQuantityName == 're_converted':
+                    aYsigmas = aData['re_err_robust_converted'].values
+                    bYsigmas = bData['re_err_robust_converted'].values
+                for i in range(0, len(aXVals)):
+                    mass = aXVals[i]
+                    size = aYVals[i]
+                    sigma = aYsigmas[i]
+                    upperSigma = np.log10(pow(10, size) + sigma) - np.log10(pow(10, size))
+                    lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
+                    if np.isnan(upperSigma) or np.isnan(lowerSigma):
+                        plt.scatter(mass, size, alpha=0.5, color='black')
+                    else:
+                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='red')
+                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='red')
+                for i in range(0, len(bXVals)):
+                    mass = bXVals[i]
+                    size = bYVals[i]
+                    sigma = bYsigmas[i]
+                    upperSigma = np.log10(pow(10, size) + sigma) - np.log10(pow(10, size))
+                    lowerSigma = np.log10(pow(10, size)) - np.log10(pow(10, size) - sigma)
+                    if np.isnan(upperSigma) or np.isnan(lowerSigma):
+                        plt.scatter(mass, size, alpha=0.5, color='black')
+                    else:
+                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='blue')
+                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
+            if colorType != None:
+                plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
+            # Plot van der Wel et al. 2014 line in the case where we are plotting the stellar mass-size relation (passive v starforming) for the field.
+            if xQuantityName == 'Mstellar' and (yQuantityName == 're' or yQuantityName == 're_converted') and colorType == "passive" and ("nonmember_adjusted == 1" in additionalCriteria or "nonmember_adjusted == 1" in self.standardCriteria):
+                self.plotVanDerWelLines()
+            # Return data counts (used when running test suite)
+            xA = aXVals.shape[0]
+            yA = aYVals.shape[0]
+            if colorType != None:
+                xB = bXVals.shape[0]
+                yB = bYVals.shape[0]
+            else:
+                xB = 0
+                yB = 0
+            print(xA, xB, yA, yB)
+            return (xA, xB, yA, yB)
+    # END PLOTUNWRAPPED
 
-    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, useMembers:str='only', colorType:str=None,
-             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, test:bool=False, file:__file__=None):
+
+    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, useMembers:str='only', colorType:str=None, colors:list=None, 
+        useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -857,8 +1422,6 @@ class GOGREEN:
                                     Value: 2 - plot all the clusters on seperate plots (subplot)
                                     Value: 3 - plot all the clusters on a single plot
         :param clusterName:        Name of the cluster to plot (if param:plotType is 1)
-                                    Default: None
-        :param additionalCriteria: List of desired criteria the plotted galaxies should meet
                                     Default: None
         :param useMembers:        Flag to indicate whether only cluster members should be plotted or only non-members should be plotted.
                                     Default: 'only' - only members
@@ -886,198 +1449,71 @@ class GOGREEN:
                                     Value:   [False,True] - y axis in log scale
                                     Value:   [True,False] - x axis in log scale
                                     Value:   [True,True] - both axis in log scale
-        :param fitLine:             Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
-                                     (note: the default x and y will be in log, however specifically selected values will correspond to the useLog list)
-                                     (note: not currently configured to work with plot type 2)
-        :return:                  The generated plot(s) will be displayed
+        :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
+                                    Default: False
+        :param bootstrap           Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
+                                    Default: True
+        :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted
+                                    Default: False
+        :param plotTransitionType  Flag to indicate whether individual galaxies should have their Re error plotted
+                                    Default: None
+                                    Value: GV - plot green valley trend
+                                    Value: BQ - plot blue quiescent trend    
+                                    Value: PSB - plot post-starburst trend                     
+        :return:                   (xA, xB, yA, yB), representing the total number of x-values and y-values corresponding to plotted data points in two populations. Generated plot is displayed.
         """
-        # Generate random colors
-        color1 = [1, rng.random(), rng.random()]
-        color2 = [0, rng.random(), rng.random()]
+        # Initialize additional criteria
+        additionalCriteria = []
+        # Initialize plot
+        plt.figure(figsize=(8,6))
         # Check if plot colors were provided by the user
-        if (colors != None):
+        if colors != None:
             color1 = colors[0]
             color2 = colors[1]
+        # If not, generate random colors
+        else:
+            if colorType == 'passive':
+                color1 = "red"
+                color2 = "blue"
+            else:
+                color1 = "green"
+                color2 = "orange"
+        # Establish membership criteria
+        if useMembers == None:
+            print("Please specify membership requirements!")
+            return
+        elif useMembers == 'all':
+            # Reduce data to only contain galaxies classified as members or non-members
+            additionalCriteria.append('member_adjusted == 1 or nonmember_adjusted == 1')
+        elif useMembers == 'only':
+            # Reduce data to only contain galaxies classified as members
+            additionalCriteria.append('member_adjusted == 1')
+        elif useMembers == 'not':
+            # Reduce data to only contain galaxies not classified as members
+            additionalCriteria.append('nonmember_adjusted == 1')
+        else:
+            print(useMembers, " is not a valid membership requirement!")
+            return
         # Plot only the cluster specified
         if plotType == 1:
             if clusterName == None:
                 print("No cluster name provided!")
                 return
-            # Get all galaxies associated with this cluster
-            data = self.getClusterGalaxies(clusterName)
-            if useMembers == 'only':
-                # Reduce data to only contain galaxies classified as members
-                data = self.getMembers(clusterName)
-            if useMembers == 'not':
-                # Reduce data to only contain galaxies not classified as members
-                data = self.getNonMembers(clusterName)
-            # Apply other specified reducing constraints
-            data = self.reduceDF(data, additionalCriteria, useStandards)
-            # Plot depending on how the values should be colored
-            if colorType == None:
-                # Extract desired quantities from data
-                xData = data[xQuantityName].values
-                yData = data[yQuantityName].values
-                # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                if xQuantityName == 're':
-                    xData, xSigmas = self.reConvert(data)
-                if yQuantityName == 're':
-                    yData, ySigmas = self.reConvert(data)
-                # Check if either axis needs to be put in log scale
-                if useLog[0] == True:
-                    xData = np.log10(xData)
-                if useLog[1] == True:
-                    yData = np.log10(yData)
-                # Generate the plot
-                plt.scatter(xData, yData, color=color1)
-                # generate best fit line
-                if fitLine == True:
-                    self.MSRfit(data, useLog)
-                # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    #self.plotVanDerWelLines()
-                if test:
-                    x = xData.shape[0]
-                    y = yData.shape[0]
-                    file.write(str(x) +  ' ' + str(y) + ' ')
-            elif colorType == 'membership':
-                # Extract desired quantities from data
-                specZ = data[~data['zspec'].isna()]
-                # Assume photZ are those that do not have a specZ
-                photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])]
-                specXData = specZ[xQuantityName].values
-                specYData = specZ[yQuantityName].values
-                photXData = photZ[xQuantityName].values
-                photYData = photZ[yQuantityName].values
-                # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                if xQuantityName == 're':
-                    specXData, specXSigmas = self.reConvert(specZ)
-                    photXData, photXSigmas = self.reConvert(photZ)
-                if yQuantityName == 're':
-                    specYData, photXSigmas = self.reConvert(specZ)
-                    photYData, photYSigmas = self.reConvert(photZ)
-                # Check if either axis needs to be put in log scale
-                if useLog[0] == True:
-                    specXData = np.log10(specXData)
-                    photXData = np.log10(photXData)
-                if useLog[1] == True:
-                    specYData = np.log10(specYData)
-                    photYData = np.log10(photYData)
-                # Generate the plot
-                plt.scatter(specXData, specYData, color=color1, label='Spectroscopic z')
-                plt.scatter(photXData, photYData, color=color2, label='Photometric z')
-                # generate best fit line
-                if fitLine == True:
-                    self.MSRfit(data, useLog)
-                # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    #self.plotVanDerWelLines()
-                if test:
-                    xSpec = specXData.shape[0]
-                    ySpec = specYData.shape[0]
-                    xPhot = photXData.shape[0]
-                    yPhot = photYData.shape[0]
-                    file.write(str(xSpec + xPhot) +  ' ' + str(ySpec + yPhot) + ' ')
-            elif colorType == 'passive':
-                # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
-                passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                # Build active query string, limiting mass to > 10^9.5
-                starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                # Extract desired quantities from data
-                passive = data.query(passiveQuery)
-                starForming = data.query(starFormingQuery)
-                # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                # With the Mstellar restrictions set above this does not actually make a difference, but we need to be aware of this if we ever change those restrictions.
-                passive = self.reduceDF(passive, additionalCriteria, useStandards)
-                starForming = self.reduceDF(starForming, additionalCriteria, useStandards)
-                # Continue extracting desired quantities
-                passiveX = passive[xQuantityName].values
-                passiveY = passive[yQuantityName].values
-                starFormingX = starForming[xQuantityName].values
-                starFormingY = starForming[yQuantityName].values
-                # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                if xQuantityName == 're':
-                    passiveX, passiveXSigmas = self.reConvert(passive)
-                    starFormingX, starFormingXSigmas = self.reConvert(starForming)
-                if yQuantityName == 're':
-                    passiveY, passiveYSigmas = self.reConvert(passive)
-                    starFormingY, starFormingYSigmas = self.reConvert(starForming)
-                # Check if either axis needs to be put in log scale
-                if useLog[0] == True:
-                    passiveX = np.log10(passiveX)
-                    starFormingX = np.log10(starFormingX)
-                if useLog[1] == True:
-                    passiveY = np.log10(passiveY)
-                    starFormingY = np.log10(starFormingY)
-                # Generate the plot
-                plt.scatter(passiveX, passiveY, color=color1, label='Quiescent')
-                plt.scatter(starFormingX, starFormingY, color=color2, label='Star Forming')
-                # generate best fit line
-                if fitLine == True:
-                    self.MSRfit(passive, useLog, color=color1)
-                    self.MSRfit(starForming, useLog, color=color2)
-                # Plot passive v star-forming border in the case where we are plotting UVJ color-color
-                if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                    self.plotPassiveLines()
-                # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    #self.plotVanDerWelLines()
-                if test:
-                    xPassive = passiveX.shape[0]
-                    yPassive = passiveY.shape[0]
-                    xSF = starFormingX.shape[0]
-                    ySF = starFormingY.shape[0]
-                    file.write(str(xPassive + xSF) +  ' ' + str(yPassive + ySF) + ' ')
-            elif colorType == 'sersic':
-                elliptical = data.query('2.5 < n < 6')
-                spiral = data.query('n < 2.5')
-                ellipticalX = elliptical[xQuantityName].values
-                ellipticalY = elliptical[yQuantityName].values
-                spiralX = spiral[xQuantityName].values
-                spiralY = spiral[yQuantityName].values
-                # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                if xQuantityName == 're':
-                    ellipticalX, ellipticalXSigmas = self.reConvert(elliptical)
-                    spiralX, spiralXSigmas = self.reConvert(spiral)
-                if yQuantityName == 're':
-                    ellipticalY, ellipticalYSigmas = self.reConvert(elliptical)
-                    spiralY, spiralYSigmas = self.reConvert(spiral)
-                # Check if either axis needs to be put in log scale
-                if useLog[0] == True:
-                    ellipticalX = np.log10(ellipticalX)
-                    spiralX = np.log10(spiralX)
-                if useLog[1] == True:
-                    ellipticalY = np.log10(ellipticalY)
-                    spiralY = np.log10(spiralY)
-                # Generate the plot
-                plt.scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
-                plt.scatter(spiralX, spiralY, color=color2, label='n < 2.5')
-                # generate best fit line
-                if fitLine == True:
-                    self.MSRfit(elliptical, useLog, color=color1)
-                    self.MSRfit(spiral, useLog, color=color2)
-                # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                    #self.plotVanDerWelLines()
-                if test:
-                    xElliptical = ellipticalX.shape[0]
-                    yElliptical = ellipticalY.shape[0]
-                    xSpiral = spiralX.shape[0]
-                    ySpiral = spiralY.shape[0]
-                    file.write(str(xElliptical + xSpiral) +  ' ' + str(yElliptical + ySpiral) + ' ')
-            else:
-                print(colorType, ' is not a valid coloring scheme!')
-
+            # Plot data
+            clusterCriterion = 'cluster == \'' + clusterName + '\''
+            additionalCriteria.append(clusterCriterion)
+            xATot, xBTot, yATot, yBTot = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=additionalCriteria, 
+                useStandards=useStandards, color1=color1, color2=color2, plot=plt, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
         # Plot all clusters individually in a subplot
         elif plotType == 2:
+            # Initialize data count totals (used when running test suite)
+            xATot = 0
+            xBTot = 0
+            yATot = 0
+            yBTot = 0
             # Generate the subplots
             _, axes = plt.subplots(4,3,figsize=(15,12))
             currentIndex = 0
-            if test:
-                xA = 0
-                xB = 0
-                yA = 0
-                yB = 0
             # Loop over each subplot
             for i in range(4):
                 for j in range(3):
@@ -1085,167 +1521,16 @@ class GOGREEN:
                     if (currentIndex == len(self._structClusterNames)):
                         break
                     currentClusterName = self._structClusterNames[currentIndex]
-                    # Get all galaxies associated with this cluster
-                    data = self.getClusterGalaxies(currentClusterName)
-                    if useMembers == 'only':
-                        # Reduce data to only contain galaxies classified as members
-                        data = self.getMembers(currentClusterName)
-                    if useMembers == 'not':
-                        # Reduce data to only contain galaxies not classified as members
-                        data = self.getNonMembers(currentClusterName)
-                    # Apply other specified reducing constraints
-                    data = self.reduceDF(data, additionalCriteria, useStandards)
-                    # Plot depending on how the values should be colored
-                    if colorType == None:
-                        # Extract desired quantities from data
-                        xData = data[xQuantityName].values
-                        yData = data[yQuantityName].values
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                        if xQuantityName == 're':
-                            xData, xSigmas = self.reConvert(data)
-                        if yQuantityName == 're':
-                            yData, ySigmas = self.reConvert(data)
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            xData = np.log10(xData)
-                        if useLog[1] == True:
-                            yData = np.log10(yData)
-                        # Generate the plot on the subplot
-                        axes[i][j].scatter(xData, yData, c=color1)
-                        # Add fit line
-                        if fitLine == True:
-                            self.MSRfit(data, useLog, axes, i, j)
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            #self.plotVanDerWelLines(axes, i, j)
-                        if test:
-                            xA = xA + xData.shape[0]
-                            yA = yA + yData.shape[0]
-                    elif colorType == 'membership':
-                        # Extract desired quantities from data
-                        specZ = data[~data['zspec'].isna()]
-                        # Assume photZ are those that do not have a specZ
-                        photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])]
-                        specXData = specZ[xQuantityName].values
-                        specYData = specZ[yQuantityName].values
-                        photXData = photZ[xQuantityName].values
-                        photYData = photZ[yQuantityName].values
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                        if xQuantityName == 're':
-                            specXData, specXSigmas = self.reConvert(specZ)
-                            photXData, photXSigmas = self.reConvert(photZ)
-                        if yQuantityName == 're':
-                            specYData, specYSigmas = self.reConvert(specZ)
-                            photYData, photYSigmas = self.reConvert(photZ)
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            specXData = np.log10(specXData)
-                            photXData = np.log10(photXData)
-                        if useLog[1] == True:
-                            specYData = np.log10(specYData)
-                            photYData = np.log10(photYData)
-                        # Generate the plot on the subplot
-                        axes[i][j].scatter(specXData, specYData, color=color1, label='Spectroscopic z')
-                        axes[i][j].scatter(photXData, photYData, color=color2, label='Photometric z')
-                        #Add fit line
-                        if fitLine == True:
-                            self.MSRfit(data, useLog, axes, i, j)
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                           # self.plotVanDerWelLines(axes, i, j)
-                        if test:
-                            xA = xA + specXData.shape[0]
-                            yA = yA + specYData.shape[0]
-                            xB = xB + photXData.shape[0]
-                            yB = yB + photYData.shape[0]
-                    elif colorType == 'passive':
-                        # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
-                        passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                        # Build active query string, limiting mass to > 10^9.5
-                        starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                        # Extract desired quantities from data
-                        passive = data.query(passiveQuery)
-                        starForming = data.query(starFormingQuery)
-                        # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                        # With the Mstellar restrictions set above this does not actually make a difference, but we need to be aware of this if we ever change those restrictions.
-                        passive = self.reduceDF(passive, additionalCriteria, useStandards)
-                        starForming = self.reduceDF(starForming, additionalCriteria, useStandards)
-                        # Continue extracting desired quantities
-                        passiveX = passive[xQuantityName].values
-                        passiveY = passive[yQuantityName].values
-                        starFormingX = starForming[xQuantityName].values
-                        starFormingY = starForming[yQuantityName].values
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                        if xQuantityName == 're':
-                            passiveX, passiveXSigmas = self.reConvert(passive)
-                            starFormingX, starFormingXSigmas = self.reConvert(starForming)
-                        if yQuantityName == 're':
-                            passiveY, passiveYSigmas = self.reConvert(passive)
-                            starFormingY, starFormingYSigmas = self.reConvert(starForming)
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            passiveX = np.log10(passiveX)
-                            starFormingX = np.log10(starFormingX)
-                        if useLog[1] == True:
-                            passiveY = np.log10(passiveY)
-                            starFormingY = np.log10(starFormingY)
-                        # Generate the plot on the subplot
-                        axes[i][j].scatter(passiveX, passiveY, color=color1, label='Quiescent')
-                        axes[i][j].scatter(starFormingX, starFormingY, color=color2, label='Star Forming')
-                        # Add fit line
-                        if fitLine == True:
-                            self.MSRfit(passive, useLog, axes, i, j, color=color1)
-                            self.MSRfit(starForming, useLog, axes, i, j, color=color2)
-                        # Plot passive v star-forming border in the case where we are plotting UVJ color-color
-                        if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                            self.plotPassiveLines(axes, i, j)
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            #self.plotVanDerWelLines(axes, i, j)
-                        if test:
-                            xA = xA + passiveX.shape[0]
-                            yA = yA + passiveY.shape[0]
-                            xB = xB + starFormingX.shape[0]
-                            yB = yB + starFormingY.shape[0]
-                    elif colorType == 'sersic':
-                        elliptical = data.query('2.5 < n < 6')
-                        spiral = data.query('n < 2.5')
-                        ellipticalX = elliptical[xQuantityName].values
-                        ellipticalY = elliptical[yQuantityName].values
-                        spiralX = spiral[xQuantityName].values
-                        spiralY = spiral[yQuantityName].values
-                        # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                        if xQuantityName == 're':
-                            ellipticalX, ellipticalXSigmas = self.reConvert(elliptical)
-                            spiralX, spiralXSigmas = self.reConvert(spiral)
-                        if yQuantityName == 're':
-                            ellipticalY, ellipticalYSigmas = self.reConvert(elliptical)
-                            spiralY, spiralYSigmas = self.reConvert(spiral)
-                        # Check if either axis needs to be put in log scale
-                        if useLog[0] == True:
-                            ellipticalX = np.log10(ellipticalX)
-                            spiralX = np.log10(spiralX)
-                        if useLog[1] == True:
-                            ellipticalY = np.log10(ellipticalY)
-                            spiralY = np.log10(spiralY)
-                        # Generate the plot
-                        axes[i][j].scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
-                        axes[i][j].scatter(spiralX, spiralY, color=color2, label='n < 2.5')
-                        # generate best fit line
-                        if fitLine == True:
-                            self.MSRfit(elliptical, useLog, axes, i, j, color=color1)
-                            self.MSRfit(spiral, useLog, axes, i, j, color=color2)
-                        # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-                        #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                            #self.plotVanDerWelLines(axes, i, j)
-                        if test:
-                            xA = xA + ellipticalX.shape[0]
-                            yA = yA + ellipticalY.shape[0]
-                            xB = xB + spiralX.shape[0]
-                            yB = yB + spiralY.shape[0]
-                    else:
-                        print(colorType, ' is not a valid coloring scheme!')
-
+                    # Plot data for current cluster
+                    currentAdditionalCriteria = additionalCriteria.copy()
+                    currentAdditionalCriteria.append('cluster == \'' + currentClusterName + '\'')
+                    xA, xB, yA, yB = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=currentAdditionalCriteria, 
+                        useStandards=useStandards, color1=color1, color2=color2, plot=axes[i][j], axes=axes, row=i, col=j, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
+                    # Update data count totals
+                    xATot+=xA
+                    xBTot+=xB
+                    yATot+=yA
+                    yBTot+=yB
                     # Plot configurations for plotType 2
                     axes[i][j].set(xlabel=xLabel, ylabel=yLabel)
                     if (xRange != None):
@@ -1253,7 +1538,9 @@ class GOGREEN:
                     if (yRange != None):
                         axes[i][j].set(ylim=yRange)
                     axes[i][j].set(title=currentClusterName)
-                    axes[i][j].legend()
+                    if colorType != None:
+                        # Avoid calling legend() if there are no labels
+                        axes[i][j].legend()
                     currentIndex += 1
             # Remove the 12th subplot from the figure otherwise blank axes will be displayed
             plt.delaxes(axes[3][2])
@@ -1261,187 +1548,13 @@ class GOGREEN:
             # These specifc values were found at:
             # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
-            if test:
-                file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
-
         # Plot all clusters on the same plot            
         elif plotType == 3:
-            # Loop over every cluster
-            if test:
-                xA = 0
-                xB = 0
-                yA = 0
-                yB = 0
-            for clusterName in self._structClusterNames:
-                # Get all galaxies associated with this cluster
-                data = self.getClusterGalaxies(clusterName)
-                if useMembers == 'only':
-                    # Reduce data to only contain galaxies classified as members
-                    data = self.getMembers(clusterName)
-                if useMembers == 'not':
-                    # Reduce data to only contain galaxies not classified as members
-                    data = self.getNonMembers(clusterName)
-                # Apply other specified reducing constraints
-                data = self.reduceDF(data, additionalCriteria, useStandards)
-                 # Plot depending on how the values should be colored
-                if colorType == None:
-                    # Extract desired quantities from data
-                    xData = data[xQuantityName].values
-                    yData = data[yQuantityName].values
-                    # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                    if xQuantityName == 're':
-                        xData, xSigmas = self.reConvert(data)
-                    if yQuantityName == 're':
-                        yData, ySigmas = self.reConvert(data)
-                    # Check if either axis needs to be put in log scale
-                    if useLog[0] == True:
-                        xData = np.log10(xData)
-                    if useLog[1] == True:
-                        yData = np.log10(yData)
-                    # Generate the plot
-                    plt.scatter(xData, yData, c=color1)
-                    if test:
-                        xA = xA + xData.shape[0]
-                        yA = yA + yData.shape[0]
-                elif colorType == 'membership':
-                    specZ = data[~data['zspec'].isna()]
-                    # Assume photZ are those that do not have a specZ
-                    photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])]
-                    specXData = specZ[xQuantityName].values
-                    specYData = specZ[yQuantityName].values
-                    photXData = photZ[xQuantityName].values
-                    photYData = photZ[yQuantityName].values
-                    # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                    if xQuantityName == 're':
-                        specXData, specXSigmas = self.reConvert(specZ)
-                        photXData, photXSigmas = self.reConvert(photZ)
-                    if yQuantityName == 're':
-                        specYData, specYSigmas = self.reConvert(specZ)
-                        photYData, photYSigmas = self.reConvert(photZ)
-                    # Check if either axis needs to be put in log scale
-                    if useLog[0] == True:
-                        specXData = np.log10(specXData)
-                        photXData = np.log10(photXData)
-                    if useLog[1] == True:
-                        specYData = np.log10(specYData)
-                        photYData = np.log10(photYData)
-                    if (clusterName != self._structClusterNames[-1]):
-                        plt.scatter(specXData, specYData, color=color1)
-                        plt.scatter(photXData, photYData, color=color2)
-                    # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
-                    else:
-                        plt.scatter(specXData, specYData, color=color1, label='Spectroscopic z')
-                        plt.scatter(photXData, photYData, color=color2, label='Photometric z')
-                    if test:
-                        xA = xA + specXData.shape[0]
-                        yA = yA + specYData.shape[0]
-                        xB = xB + photXData.shape[0]
-                        yB = yB + photYData.shape[0]
-                elif colorType == 'passive':
-                    # Build passive query string (from van der Burg et al. 2020), limiting mass to > 10^9.7
-                    passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                    # Build active query string, limiting mass to > 10^9.5
-                    starFormingQuery = '(UMINV <= 1.3) or (VMINJ >= 1.6) or (UMINV <= 0.60+VMINJ)'
-                    # Extract desired quantities from data
-                    passive = data.query(passiveQuery)
-                    starForming = data.query(starFormingQuery)
-                    # Need to reduce again, as for some reason query is pulling from the unedited data despite us having reduced previously. 
-                    # With the Mstellar restrictions set above this does not actually make a difference, but we need to be aware of this if we ever change those restrictions.
-                    passive = self.reduceDF(passive, additionalCriteria, useStandards)
-                    starForming = self.reduceDF(starForming, additionalCriteria, useStandards)
-                    # Continue extracting desired quantities
-                    passiveX = passive[xQuantityName].values
-                    passiveY = passive[yQuantityName].values
-                    starFormingX = starForming[xQuantityName].values
-                    starFormingY = starForming[yQuantityName].values
-                    # Check if either axis is measuring effective radius for the purpose of unit conversion
-                    if xQuantityName == 're':
-                        passiveX, passiveXSigmas = self.reConvert(passive)
-                        starFormingX, starFormingXSigmas = self.reConvert(starForming)
-                    if yQuantityName == 're':
-                        passiveY, passiveYSigmas = self.reConvert(passive)
-                        starFormingY, starFormingYSigmas = self.reConvert(starForming)
-                    # Check if either axis needs to be put in log scale
-                    if useLog[0] == True:
-                        passiveX = np.log10(passiveX)
-                        starFormingX = np.log10(starFormingX)
-                    if useLog[1] == True:
-                        passiveY = np.log10(passiveY)
-                        starFormingY = np.log10(starFormingY)
-                    # Generate the plot
-                    if (clusterName != self._structClusterNames[-1]):
-                        plt.scatter(passiveX, passiveY, color=color1)
-                        plt.scatter(starFormingX, starFormingY, color=color2)
-                    # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
-                    else:
-                        plt.scatter(passiveX, passiveY, color=color1, label='Quiescent')
-                        plt.scatter(starFormingX, starFormingY,color=color2, label='Star Forming')
-                        # Plot passive v star-forming border in the case where we are plotting UVJ color-color
-                        if xQuantityName == 'VMINJ' and yQuantityName == 'UMINV':
-                            self.plotPassiveLines()
-                    if test:
-                        xA = xA + passiveX.shape[0]
-                        yA = yA + passiveY.shape[0]
-                        xB = xB + starFormingX.shape[0]
-                        yB = yB + starFormingY.shape[0]
-                elif colorType == 'sersic':
-                    elliptical = data.query('2.5 < n < 6')
-                    spiral = data.query('n < 2.5')
-                    ellipticalX = elliptical[xQuantityName].values
-                    ellipticalY = elliptical[yQuantityName].values
-                    spiralX = spiral[xQuantityName].values
-                    spiralY = spiral[yQuantityName].values
-                    # Check if either axis is measuring effective radius for the purpose of unit conversion.
-                    if xQuantityName == 're':
-                        ellipticalX, ellipticalXSigmas = self.reConvert(elliptical)
-                        spiralX, spriralXSigmas = self.reConvert(spiral)
-                    if yQuantityName == 're':
-                        ellipticalY, ellipticalYSigmas = self.reConvert(elliptical)
-                        spiralY, spiralYSigmas = self.reConvert(spiral)
-                    # Check if either axis needs to be put in log scale
-                    if useLog[0] == True:
-                        ellipticalX = np.log10(ellipticalX)
-                        spiralX = np.log10(spiralX)
-                    if useLog[1] == True:
-                        ellipticalY = np.log10(ellipticalY)
-                        spiralY = np.log10(spiralY)
-                    # Generate the plot
-                    if (clusterName != self._structClusterNames[-1]):
-                        plt.scatter(ellipticalX, ellipticalY, color=color1)
-                        plt.scatter(spiralX, spiralY, color=color2)
-                    # Only add legend labels for the last plot otherwise the legend will be filled with multiple duplicates of these labels
-                    else:
-                        plt.scatter(ellipticalX, ellipticalY, color=color1, label='2.5 < n < 6')
-                        plt.scatter(spiralX, spiralY, color=color2, label='n < 2.5')
-                    if test:
-                        xA = xA + ellipticalX.shape[0]
-                        yA = yA + ellipticalY.shape[0]
-                        xB = xB + spiralX.shape[0]
-                        yB = yB + spiralY.shape[0]
-                else:
-                    print(colorType, ' is not a valid coloring scheme!')
-                    # Return since in the case of plot type 3 it is possible for the remainder of the code to execute otherwise
-                    return
-            # generate best fit line
-            if fitLine == True:
-                # In the case of plotting passive vs star forming galaxies, we plot two separate fit lines
-                if colorType == 'passive':
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='passive', color=color1)
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='starForming', color=color2)
-                # In the case of plotting elliptical vs spiral inclined galaxies (based on Sersic index), we plot two separate fit lines NOTE: Handling of these cases not yet implemented in MSRfit()
-                elif colorType == 'sersic':
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='elliptical', color=color1)
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards, typeRestrict='spiral', color=color2)
-                else:
-                    self.MSRfit([], useLog, allData=True, useMembers=useMembers, additionalCriteria=additionalCriteria, useStandards=useStandards)
-            # Plot van der Wel et al. 2014 line in the case where we are plotting MSR
-            #if xQuantityName == 'Mstellar' and yQuantityName == 're':
-                #self.plotVanDerWelLines()
-            if test:
-                file.write(str(xA + xB) +  ' ' + str(yA + yB) + ' ')
+            xATot, xBTot, yATot, yBTot = self.plotUnwrapped(xQuantityName=xQuantityName, yQuantityName=yQuantityName, colorType=colorType, useLog=useLog, fitLine=fitLine, additionalCriteria=additionalCriteria, 
+                useStandards=useStandards, color1=color1, color2=color2, plot=plt, bootstrap=bootstrap, plotErrBars=plotErrBars, plotTransitionType=plotTransitionType)
         else:
             print(plotType, " is not a valid plotting scheme!")
-
+            return
         # Plot configurations for plotType 1 and 3
         # (plotType 2 handles plot configurations for each individual subplot)
         if plotType != 2:
@@ -1451,6 +1564,10 @@ class GOGREEN:
                 plt.xlim(xRange[0], xRange[1])
             if (yRange != None):
                 plt.ylim(yRange[0], yRange[1])
-            plt.legend()
+            if colorType != None:
+                # Avoid calling legend() if there are no labels
+                plt.legend()
             plt.show()
+        # Return
+        return (xATot, xBTot, yATot, yBTot)
     # END PLOT
