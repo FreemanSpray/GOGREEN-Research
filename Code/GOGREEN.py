@@ -865,8 +865,8 @@ class GOGREEN:
         if plotType == "lit":
             members = self.catalog.query('member_adjusted == 1 and goodData == 1')
             nonMembers = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
-            mMember, bMember = self.MSRfit(data=members, useLog=[True, True], typeRestrict='cluster', color="orange", bootstrap=bootstrap)
-            mNonMember, bNonMember = self.MSRfit(data=nonMembers, useLog=[True, True], typeRestrict='field', color="green", bootstrap=bootstrap)
+            mMember, bMember = self.MSRfit(data=members, useLog=[True, True], typeRestrict='cluster', color="green", bootstrap=bootstrap)
+            mNonMember, bNonMember = self.MSRfit(data=nonMembers, useLog=[True, True], typeRestrict='field', color="orange", bootstrap=bootstrap)
             # if x or y values are provided, return ratio at that value
             if x != None and y == None:
                 # Get ratios at a certain x value
@@ -1131,7 +1131,7 @@ class GOGREEN:
             # Establish variables for first test
             memberStatus = ["all", "only", "not"]
             plotType = [1, 2, 3]
-            colorType = [None, "membership", "passive", "sersic"]
+            colorType = [None, "catalog", "passive", "sersic"]
             # Plot MSR and UVJ plots for each variable
             for m in memberStatus:
                 for p in plotType:
@@ -1227,8 +1227,12 @@ class GOGREEN:
             :param yQuantityName:      Name of the column whose values are to be used as the y
             :param colorType:          Specifies how to color code the plotted galaxies
                                         Default: None
-                                        Value:   'membership' - spectroscopic member vs photometric member
+                                        Value:   'catalog' - spectroscopic vs photometric catalog source
                                         Value:   'passive' - passive vs star forming
+                                        Value:   'sersic' -  elliptical vs spiral
+                                        Value:   'environment' - cluster vs field
+                                        Value:   'environmentQ' - cluster vs field (Quiescent only)
+                                        Value:   'environmentSF' - cluster vs field (Star-forming only)
             :param useLog:             Flag to indicate whether the x- or y-axis should be in log scale
                                         Default: [False,False] - neither axis in log scale
                                         Value:   [False,True] - y axis in log scale
@@ -1263,7 +1267,6 @@ class GOGREEN:
                                         Value: PSB - plot post-starburst trend   
             :return:                   (xA, xB, yA, yB), representing the total number of x-values and y-values corresponding to plotted data points of two different populations. Generated plot is displayed.
             """
-            print(additionalCriteria)
             # Create 'goodData' flag for future checks
             self.setGoodData(additionalCriteria, useStandards)
             # Arbitrary establishment of variables for non-coloring case
@@ -1275,7 +1278,7 @@ class GOGREEN:
             if colorType == None:
                 # Don't need to do anything for this case. Included so program proceeds as normal
                 pass
-            elif colorType == 'membership':
+            elif colorType == 'catalog':
                 aData = self.catalog.query('spectroscopic == 1 and goodData == 1')
                 aLbl = 'Spectroscopic z'
                 bData = self.catalog.query('photometric == 1 and goodData == 1')
@@ -1305,11 +1308,21 @@ class GOGREEN:
                 aLbl = 'Elliptical'
                 bData = self.catalog.query('spiral == 1 and goodData == 1')
                 bLbl = 'Spiral'
-            elif colorType == 'membership':
+            elif colorType == 'environment':
                 aData = self.catalog.query('member_adjusted == 1 and goodData == 1')
                 aLbl = 'Cluster'
                 bData = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
                 bLbl = 'Field'
+            elif colorType == 'environmentQ':
+                aData = self.catalog.query('member_adjusted == 1 and passive == 1 and goodData == 1')
+                aLbl = 'Cluster (Quiescent)'
+                bData = self.catalog.query('nonmember_adjusted == 1 and passive == 1 and goodData == 1')
+                bLbl = 'Field (Quiescent)'
+            elif colorType == 'environmentSF':
+                aData = self.catalog.query('member_adjusted == 1 and starForming == 1 and goodData == 1')
+                aLbl = 'Cluster (Star-forming)'
+                bData = self.catalog.query('nonmember_adjusted == 1 and starForming == 1 and goodData == 1')
+                bLbl = 'Field (Star-forming)'
             else:
                 print(colorType, ' is not a valid coloring scheme!')
                 return
@@ -1347,7 +1360,6 @@ class GOGREEN:
                     self.MSRfit(aData, useLog, axes, row, col, typeRestrict=aLbl, color=color1, bootstrap=bootstrap)
                     self.MSRfit(bData, useLog, axes, row, col, color=color2, typeRestrict=bLbl, bootstrap=bootstrap)
                 else:
-                    #print(aData.shape)
                     self.MSRfit(aData, useLog, axes, row, col, bootstrap=bootstrap)
             # Generate the plot
             plot.scatter(aXVals, aYVals, alpha=0.5, color=color1, label=aLbl)
@@ -1378,8 +1390,8 @@ class GOGREEN:
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
                     else:
-                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='red')
-                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='red')
+                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor=color1)
+                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor=color1)
                 for i in range(0, len(bXVals)):
                     mass = bXVals[i]
                     size = bYVals[i]
@@ -1389,8 +1401,8 @@ class GOGREEN:
                     if np.isnan(upperSigma) or np.isnan(lowerSigma):
                         plt.scatter(mass, size, alpha=0.5, color='black')
                     else:
-                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor='blue')
-                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor='blue')
+                        plt.errorbar(mass, size, upperSigma, barsabove = True, ecolor=color2)
+                        plt.errorbar(mass, size, lowerSigma, barsabove = False, ecolor=color2)
             if colorType != None:
                 plot.scatter(bXVals, bYVals, alpha=0.5, color=color2, label=bLbl)
             # Plot van der Wel et al. 2014 line in the case where we are plotting the stellar mass-size relation (passive v starforming) for the field.
@@ -1405,12 +1417,11 @@ class GOGREEN:
             else:
                 xB = 0
                 yB = 0
-            print(xA, xB, yA, yB)
             return (xA, xB, yA, yB)
     # END PLOTUNWRAPPED
 
 
-    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, useMembers:str='only', colorType:str=None, colors:list=None, 
+    def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, useMembers:str='all', colorType:str=None, colors:list=None, 
         useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False], fitLine:bool=False, bootstrap:bool=True, plotErrBars:bool=False, plotTransitionType:str=None):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
@@ -1429,8 +1440,10 @@ class GOGREEN:
                                     Value:   'all' - no restriction imposed
         :param colorType:          Specifies how to color code the plotted galaxies
                                     Default: None
-                                    Value:   'membership' - spectroscopic member vs photometric member
+                                    Value:   'catalog' - spectroscopic vs photometric catalog source
                                     Value:   'passive' - passive vs star forming
+                                    Value:   'sersic' -  elliptical vs spiral
+                                    Value:   'environment' - cluster vs field
         :param colors:             Specifies what colors should be used when plotting
                                     Default: None - random colors are generated
                                     Value:   [(r,g,b), (r,g,b)]
