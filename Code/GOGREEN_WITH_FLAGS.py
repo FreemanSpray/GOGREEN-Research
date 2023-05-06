@@ -325,7 +325,7 @@ class GOGREEN:
         Apassive = pow(10, 0.22)
         alphaSF = 0.22
         alphaPassive = 0.76
-        xVals = np.array([9.5, 11.5])
+        xVals = np.array([9.8, 11.5])
         MstellarRange = pow(10, xVals)
         # Plug into equation
         yValsPassive = np.log10(np.array([Apassive * pow((i / (5 * np.float_power(10, 10))), alphaPassive) for i in MstellarRange]))
@@ -637,7 +637,7 @@ class GOGREEN:
         slope = s[0]
         intercept = s[1]
         # Define x bounds
-        xBounds = np.array([9.5,11.5])
+        xBounds = np.array([9.8,11.5])
         # Plot lines
         if row != None and col != None:
             # Check for subplots
@@ -767,7 +767,7 @@ class GOGREEN:
         m = 1.213
         b = -2.44
         rng = np.random.RandomState(1234567890)
-        randXLine = 9.5 + rng.random()*2.7
+        randXLine = 9.8 + rng.random()*2.7
         yLine = m*randXLine + b
         randUnc = rng.random()/2
         nFake = []
@@ -788,7 +788,7 @@ class GOGREEN:
                              Default: None
         :param y:           Y value at which the comparison should be made
                              Default: None
-        :param limitRange:  Flag to indicate whether the plot should be restricted to x = [9.5, 11.5] and y = [-0.75, 1.25]
+        :param limitRange:  Flag to indicate whether the plot should be restricted to x = [9.8, 11.5] and y = [-0.75, 1.25]
                              Default: True
         :param plotType:    Determines specific behavior of the function
                              Value: "default" - quiescent and star-forming ratios are calculated separately
@@ -856,7 +856,7 @@ class GOGREEN:
                 return (np.nan, np.nan)  
             # Format plot
             if limitRange:
-                plt.xlim(9.5, 11.5)
+                plt.xlim(9.8, 11.5)
                 plt.ylim(-0.75, 1.25)
             plt.legend() 
             # Return a tuple containing the ratios
@@ -889,7 +889,7 @@ class GOGREEN:
                 return (np.nan, np.nan) 
             # Format plot
             if limitRange:
-                plt.xlim(9.5, 11.5)
+                plt.xlim(9.8, 11.5)
                 plt.ylim(-0.75, 1.25)
             plt.legend()
             # Construct lit comparison plot
@@ -1140,7 +1140,7 @@ class GOGREEN:
                             cluster = "SpARCS1616"
                         else:
                             cluster = None
-                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                        xACountMSR, xBCountMSR, yACountMSR, yBCountMSR = self.plot('Mstellar', 're_converted', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                         xACountUVJ, xBCountUVJ, yACountUVJ, yBCountUVJ = self.plot('VMINJ', 'UMINV', plotType=p, clusterName=cluster, useMembers=m, colorType=c, useLog=[False,False], xRange = [-0.5,2.0], yRange = [0.0, 2.5], xLabel='V - J', yLabel='U - V', fitLine=False)
                         # End test early (and with specific error) if major discrepency is found
                         if xACountMSR != yACountMSR or xACountUVJ != yACountUVJ or xBCountMSR != yBCountMSR or xBCountUVJ != yBCountUVJ:
@@ -1161,7 +1161,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write A count
                 f.write('(' + str(xACount) + ', ')
                 # Write B count
@@ -1172,7 +1172,7 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
             # Plot MSR plot for all clusters combined
-            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="only", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-0.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write(str(xATotExpected))
             f.write(str(xBTotExpected))
@@ -1187,7 +1187,7 @@ class GOGREEN:
             f.write('\n')
             # Plot MSR plot for each cluster
             for cluster in clusterNames:
-                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+                xACount, xBCount, _, _ = self.plot('Mstellar', 're_converted', plotType=1, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
                 # Write A count
                 f.write('(' + str(xACount) + ', ')
                 # Write B count
@@ -1198,7 +1198,7 @@ class GOGREEN:
             # Write total count on another newline
             f.write('\n(' + str(xATot) + ', ' + str(xBTot) + ') ')
             # Plot MSR plot for all clusters combined
-            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.5, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
+            xATotExpected, xBTotExpected, _, _ = self.plot('Mstellar', 're_converted', plotType=3, clusterName=cluster, useMembers="not", colorType=c, useLog=[True,True], xRange = [9.8, 11.5], yRange = [-1.5, 1.5], xLabel='log(Mstellar)', yLabel='log(Re)', fitLine=False)
             # Write expected total
             f.write('(' + str(xATot) + ', ' + str(xBTot) + ') ')
             if xATot != xATotExpected or xBTot != xBTotExpected:
@@ -1305,6 +1305,11 @@ class GOGREEN:
                 aLbl = 'Elliptical'
                 bData = self.catalog.query('spiral == 1 and goodData == 1')
                 bLbl = 'Spiral'
+            elif colorType == 'membership':
+                aData = self.catalog.query('member_adjusted == 1 and goodData == 1')
+                aLbl = 'Cluster'
+                bData = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
+                bLbl = 'Field'
             else:
                 print(colorType, ' is not a valid coloring scheme!')
                 return
