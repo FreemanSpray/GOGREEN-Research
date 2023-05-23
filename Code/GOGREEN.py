@@ -766,21 +766,36 @@ class GOGREEN:
     # END BOOTSTRAP
 
     def evalLineFit(self):
-        # y = 1.213x - 2.44
+        """
+        evalLineFit Evaluates the accuracy of the line-fitting algorithm used in this class to determine the stellar mass-size relation.
+        
+        :return: estimated slope and intercept are displayed in comparison to the actual slope and intercept.
+        """
+        # y = 1.213x - 2.44  <- arbitrary line equation we choose to test
         m = 1.213
         b = -2.44
+        # Specify consistent random seed
         rng = np.random.RandomState(1234567890)
+        # Create random x value between 9.8 and 11.5
         randXLine = 9.8 + rng.random()*2.7
+        # Create y value corresponding to our x on the arbitrary line
         yLine = m*randXLine + b
+        # Create random uncertainty
         randUnc = rng.random()/2
+        # Create set of 100 fake data points located at our random x
         nFake = []
         for i in range(0, 100):
             yFake = rng.normal(loc=yLine, scale=randUnc)
             nFake.append((randXLine, yFake, yFake*randUnc))
+        # Fit a line through our fake data points
         s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=nFake[0], ydata=nFake[1], sigma=nFake[2], bounds=([-10, -10], [10, 10]), loss="huber") 
+        # Extract results
         slope = s[0]
         intercept = s[1]
-        print((slope, intercept))
+        # Display results
+        print("Actual values: slope = " + str(m) + ", intercept = " + str(b))
+        print("Estimated values: slope = " + str(slope) + ", intercept = " + str(intercept))
+        print("Difference: slope = " + str(abs(slope - m)) + ", intercept = " + str(abs(intercept - b)))
     # END EVALLINEFIT
         
 
@@ -818,13 +833,8 @@ class GOGREEN:
             if bootstrap:
                 # Initialize
                 targetXindices = [None, None]
-                diffQMemberTop = [None, None]
-                diffSFMemberTop = [None, None]
-                diffQNonMemberTop = [None, None]
-                diffSFNonMemberTop = [None, None]
                 # Extract grid of x values used for bootstrap.
                 xVals = uncMemberQ[0].tolist()
-                print(xVals)
                 # Find first target x (at ~ 10.45 log(M/Msun) - used to find correct y vals
                 for i in xVals:
                     if i > 10.45:
@@ -835,17 +845,14 @@ class GOGREEN:
                     if i > 11.2:
                         targetXindices[1] = xVals.index(i)
                         break
-                # Calculate differences between member bootstrap uncertainty top and nonMember bootstrap uncertainty bottom as well as member bottom and nonMember top at two masses
-                for i in range(2):
-                    print(targetXindices)
-                    diffQMemberTop[i] = abs(uncMemberQ[1][targetXindices[i]] - uncNonMemberQ[2][targetXindices[i]])
-                    diffSFMemberTop[i] = abs(uncMemberSF[1][targetXindices[i]] - uncNonMemberSF[2][targetXindices[i]])
-                    diffQNonMemberTop[i] = abs(uncMemberQ[2][targetXindices[i]] - uncNonMemberQ[1][targetXindices[i]])
-                    diffSFNonMemberTop[i] = abs(uncMemberSF[2][targetXindices[i]] - uncNonMemberSF[1][targetXindices[i]])
-                print(diffQMemberTop, diffSFMemberTop, diffQNonMemberTop, diffSFNonMemberTop)
-                diffQ = [min([diffQMemberTop[0], diffQNonMemberTop[0]]), min([diffQMemberTop[1], diffQNonMemberTop[1]])]
-                diffSF = [min([diffSFMemberTop[0], diffSFNonMemberTop[0]]), min([diffSFMemberTop[1], diffSFNonMemberTop[1]])]
-                print(diffQ, diffSF)
+                # Plot lines
+                plt.plot([xVals[targetXindices[0]], xVals[targetXindices[0]]], [uncMemberQ[2][targetXindices[0]], uncNonMemberQ[1][targetXindices[0]]], color="blue")
+                plt.plot([xVals[targetXindices[1]], xVals[targetXindices[1]]], [uncMemberQ[1][targetXindices[1]], uncNonMemberQ[2][targetXindices[1]]], color="blue")
+                plt.plot([xVals[targetXindices[0]], xVals[targetXindices[0]]], [uncMemberQ[1][targetXindices[0]], uncNonMemberQ[2][targetXindices[0]]], color="red")
+                plt.plot([xVals[targetXindices[1]], xVals[targetXindices[1]]], [uncMemberQ[2][targetXindices[1]], uncNonMemberQ[1][targetXindices[1]]], color="red")
+                    #plt.plot([xVals[targetXindices[i]], xVals[targetXindices[i]]], [uncMemberSF[1][targetXindices[i]], uncNonMemberSF[2][targetXindices[i]]], color="green")
+                    #plt.plot([xVals[targetXindices[i]], xVals[targetXindices[i]]], [uncMemberSF[2][targetXindices[i]], uncNonMemberSF[1][targetXindices[i]]], color="orange")
+
         # Transition galaxy option
         if plotType == "transition":
             # Extracted desired quantities from data
@@ -931,8 +938,8 @@ class GOGREEN:
             plt.figure()
             # Cooper+12 measured ~0.1 at redshift ~0.8
             plt.scatter(0.8, 0.1, label="Cooper+12")
-            # Cooper+12 measured ~0.1 at redshift ~1.3
-            plt.scatter(0.8, 0.1, label="Raichoor+12")
+            # Cooper+12 measured ~? at redshift ~1.3
+            plt.scatter(1.3, 0.1, label="Raichoor+12")
             # Currently estimating our redshift to be at 1.25
             plt.scatter(1.25, diff, label="Our measurement")
             plt.xlabel("Redshift")
@@ -942,7 +949,7 @@ class GOGREEN:
             plt.legend()
             # Return our ratio and a nan value in the second slot in case this is incorrectly accessed
             return (ratio, np.nan)  
-    #END GETRATIO
+    # END COMPTRENDS
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
         """
@@ -1250,7 +1257,7 @@ class GOGREEN:
             if testOutput == expectedOutput:
                 print("test passed.")
                 return
-            print("test failed due to unspecified error case.")
+            print("test failed due to inconsistency with previous results.")
     # END TEST
     
     def plotUnwrapped(self, xQuantityName:str, yQuantityName:str, colorType:str=None, useLog:list=[False,False], fitLine:bool=False, additionalCriteria:list=None, useStandards:bool=False,
@@ -1518,7 +1525,7 @@ class GOGREEN:
         if colors != None:
             color1 = colors[0]
             color2 = colors[1]
-        # If not, generate random colors
+        # If not, generate default colors
         else:
             if colorType == 'passive':
                 color1 = "red"

@@ -1,34 +1,80 @@
 GOGREEN Class README
 
-Originally developed to be an efficient and adaptable plotting interface for the data from the GOGREEN survey, I have adapted and reworked this class to be specifically suited to research related to the stellar mass-size relation of galaxies in the survey. The need to construct and examine trendlines for this relation saw the addition of multiple private methods as well as two more public methods, evalLineFit() and compTrends(). I also reworked most of the functions previously created for the plot, for two primary reasons:
-    1) I refactored the Plot() function, sacrificing some readability in favor of efficiency. This was done partly for the sake of speed, but more so to make the function more easily adaptable, as while the simple code structure made it easy to add new features, each new feature made it increasingly difficult to implement global changes.
-    2) Flags
+Originally developed to be an efficient and adaptable plotting interface for the data from the GOGREEN survey, I have adapted and reworked this class to be specifically suited to research related to the environmental dependence of the stellar mass-size relation of galaxies in the survey. The need to construct and examine trendlines for this relation saw the addition of multiple private methods as well as three more public methods: testPlots(), evalLineFit() and compTrends(). I also reworked most of the functions previously created for the plot, for two primary reasons:
 
+    1. I refactored the Plot() function, sacrificing some readability in favor of efficiency. This was done partly for the sake of speed, but more so to make the function more easily adaptable, as while the simple code structure made it easy to add new features, each new feature made it increasingly difficult to implement global changes.
 
+    2. Flag-based catalog implementation: the previous version of this class restricted the GOGREEN catalog in use by storing the catalog in variables and reducing the size of this catalog with each added restriction. This made adjustments to the pre-existing codebase, as well as general debugging, more difficult as it was not possible to reverse these reductions. Instead we turned to an implementation that utilizes only the base catalog, adding additional columns that act as 'flags' at compilation that can then be read at runtime to determine what category a galaxy belongs to.
 
-
-The motivation behind this class was to automate plot generation and access to GOGREEN cluster data. A single plot requires extracting members associated with some cluster, reducing the set of members to only those that meet some specified criteria, then plotting the results. The class strives to encapsulate commonly used routines for extracting desired data from the GOGREEN catalogs into an easy to use object that handles most of the work behind the scenes. The accompanying Jupyter Notebook "myDataAnalysis.ipynb" has a thorough explaination of the class, its members and methods, as well as provides some sample usage and example plots. It is this plot() method that is the primary reason for creating the GOGREEN class in the first place. Having manually generated multiple plots, it became obvious that many aspects of the process remain static and the few parameters that do change could be automated. With that in mind, the goal of plot() was to pass in as input the name of the quantity to plot on the x-axis, and the name of the quantity to plot on the y-axis and let the class take care of the rest. Many of the method parameters have default values that are common choices in many cases, leaving customization options available to the user.
-
-With that being said, I attempted to write the class in a way that is extendable and able to adapt for specific use cases. One could add new methods that apply different constraints to the data, much in the same way getMembers() reduces a larger DataFrame into one containing only spectroscopic or photometic members. While this is fine for "outside the class" plotting or analysis, if the class is to plot it using its plot() method, one must therefore modify that method too.
 
 The Plot Method
 
-If the plot() method is to be extended, it is worth some time to talk about how the code is structured and where things could be changed. 
+This function was originally the only public method of the class, designed to be the single interface for the user to the survey. After refactoring, it is still the primary interface for the user, however the portion of its functionality related to the treatment and plotting of the data are now handled by a private method, plotUnwrapped(). The plot() method is responsible for the following:
 
-The primary structure of the method consists of nested if-else blocks where the outer block checks the value of plotType and the inner block checks the value of colorType. Note plotTypes 1 and 3 are similar in the sense they both only generate a single plot and plotTypes 2 and 3 are similar in the sense they both loop over every cluster in the catalog. While an "elegent" solution would contain at most a single loop through the list of clusters, juggling various plotType and colorType combinations would make the method terribly difficult to read. It is in light of this that the method was designed using nested if-else blocks, even though it involves the repeated reuse of code. 
+    1. Initializing the plot and choosing colors (colors are population-based if not specified by player).
+    2. Constructing list of additional criteria (a separate list from those stored in the standardCriteria member variable) to be applied to the data. This includes membership specifications (based on param:useMembers) and cluster specifications (based on param:plotType).
+    3. Calls plotUnwrapped() in the appropriate way based on param:plotType (call is made 11 times for plot type 2, subplots)
+    4. Formats plots appropriately based on param:plotType
 
-In fact, because of this KISS (Keep It Simple Stupid) design, adaptations/extensions are far more feasible. To add a different plotType, one would need to add a new block to the outer if-else statement. Assuming no modifications have been made, this would go after "elif plotType == 3" but before the closing else. Within this new plotType, a new colorType if-else block would need to be constructed to maintain use with the already implemented "membership" or "passive" values. This could simply involve copying the inner if-else block from plotType 2 or 3 or, depending on how the new plotType is generating plots, might require minor changes.
+Return: the plot() method returns the same four return values returned by plotUnwrapped() (the size of the data being plotted, divided along population lines and for both the x and y axis. These return values are used only for testing accuracy, for example in the testPlots() method). Note that for plot type 2, these returns are totalled up first.
 
-Another adaptation could involve adding a new colorType to differentiate between sources in ways other than by the implemented "membership" or "passive". The if-else structure of the method lends nicely to this as well. To add a new colorType, a new block should be added to every inner if-else block. Again assuming no changes to the original code have been made, this would be placed after "elif colorType == 'passive'". It needs to be done inside every plotType if-else block as to ensure the new colorType is accessible no matter which plotType is chosen.
+Usage: the plot() method has three mandatory parameters: param:xQuantityName and param:yQuantityName which specify the values to plot on the respective axes, and param:plotType which determines whether galaxies from only a single cluster should be plotted, or galaxies from all clusters should be plotted in separate subplots or in a stack. Note that if the first of these plot types is used, param:clusterName is also to be considered mandatory, as the plot will fail to complete without it. param:clusterName does nothing otherwise.
 
-For graphical appearances, many more parameters could be added to modify the configuration of the final plot(s). The code handling plot configuration is found at the end of the plotType==2 block as well as after the main plotType if-else block. The code contained in these two locations is nearly identical with the only difference being the statements contained in the plotType 2 block act on subplots. To add more control over this configuration, after adding a new parameter to specify when it should be used, add the appropriate pyplot statements to add that configuration to the plot. Again, this must be done in both plot configuration locations to maintain the robustness of the method.
+There are 13 additional parameters beyond the 4 specified above that alter how the data is presented, either by changing the data selection (param:useStandards, param:useMembers), the format of the data (param:useLog), the population divides of the data (param:colorType), the aesthetics of the plot (param:xRange, param:yRange, param:xLabel, param:yLabel, param:colors), or with the plotting of additional information (param:fitline, param:bootstrap, param:plotErrBars, param:plotTransitionType).
 
-Possible Improvements:
-    * Specify an alpha value for plotted sources
-    * Specify a title for plot generated by plotType 1 and 3
-    * Add a method to return passive vs star-forming sources (similar to how getMembers() returns spec members vs phot members)
-    * Have plot() return the DataFrame it used to generate the plot (for "out of class" analysis/plotting)
-    * Combine the Redshift catalog with the catalog member
-    * Add a method to generate a list of sources to circle in a DS9 image
-    * Add a method to fit the data generated by plot()
-    * Have plot() save the generated figures
+An important note is that the following 8 parameters are not utilized directly in plot(), but are included to be passed to plotUnwrapped(): param:xQuantityName, param:yQuantityName,  param:useStandards, param:useLog, param:fitline, param:bootstrap, param:plotErrBars, param:plotTransitionType. 
+
+Information regarding the data types, default and accepted values of all 17 parameters (as for all other methods) can be found in the documentation above the method in GOGREEN.py. 
+
+
+The TestPlots Method
+
+The testPlots() method was created to act as a security check whenever large-scale changes were made to the code. It produces a number of plots and analyzes the amount of galaxies plotted in order to verify the following functionality of the class:
+
+    1. Every plotted x value has a corresponding y value.
+    2. Different xQuantityName and yQuantityName values do not impact the number of galaxies plotted.
+    3. The total number of galaxies plotted in each invidual cluster (total of 11 plots of plot type 1) is the same as the number of cluster galaxies plotted in a stack (plot type 3). The same is done for the field sample associated with each cluster. It is also verified that these numbers are consistent for different population splits (i.e. quiescent vs star-forming).
+    4. The numbers produced in this test are correct according to the truth values specified in the file GOGREEN-Research\Notebooks\truth.txt. Note that if changes have been made to the codebase that intentionally alter the number of data points plotted by the plot() method, this truth file is no longer valid and will cause this test to fail. I recommend first verifying all other tests pass, then verifying through some other means that the specific numbers of galaxies being plotted are valid, then finally replacing the data in GOGREEN-Research\Notebooks\truth.txt with the data output by the testPlots() method, located in GOGREEN-Research\Notebooks\testOutput.txt.
+
+The CompTrends Method
+
+The compTrends() method acts as a hub for methods of analyzing the stellar mass-size relation trends for the survey. It can be run with one of three distinct modules, specified with param:plotType: 
+
+    1. default: plots four bare trendlines (quiescent and star-forming cluster vs field) and returns the two ratios of cluster over field trends at an X or Y value specified with param:x or param:y.
+    2. transition: plots ten bare trendlines (quiescent, star-forming, green valley, blue quiescent, post-starburst cluster vs field) and returns the two ratios of cluster over field (quiescent and star-forming only, same as default) trends at an X or Y value specified with param:x or param:y.
+    3. lit: plots two bare trendlines for full population cluster vs field. Also plots the difference between the cluster and field trends at an X or Y value specified with param:x or param:y as a function of redshift, comparing to other results in the literature (NOTE: THIS PLOT IMPLEMENTATION IS INCOMPLETE). Returns the ratio of cluster over field trends at an X or Y value specified with param:x or param:y. Note that since the function returns a tuple, the second returned parameter will be NaN for this module.
+
+Other parameters:
+
+    param:limitRange: boolean that reframes the plot to fit x = [9.8, 11.5] and y = [-0.75, 1.25]
+    param:bootstrap: a boolean option for module 1 & 2 that plots the bootstrap uncertainty with each trend and compares the error regions (NOTE: THIS PLOT IMPLEMENTATION IS INCOMPLETE).
+
+
+The EvalLineFit Method:
+
+The evalLineFit() method generates a set of data points at a random place on an arbitrary line with random uncertainties, then fits a line to this data to determine the accuracy of the line-fitting method used. NOTE: THIS METHOD NEEDS WORK - LOOKING OVER IT I SUSPECT I MISUNDERSTOOD THE METHOD, AS VARYING ONLY THE UNCERTAINTY SEEMS COUNTERINTUITIVE TO GOOD DATA. COULD ALSO USE FURTHER EXPLORATION LIKE MORE RANDOM ATTEMPTS OR MORE LINE EQUATIONS - COULD TRY A CURVE.
+
+
+The PlotMcNabPlots Method:
+
+The plotMcNabPlots() method was created with the aim to exactly recreate several significant results regarding galaxy population counts for quiescent, star-forming, green valley, blue quiescent, and post-starburst galaxies in the GOGREEN survey from McNab et. al. 2021. When called it sets the standardCriteria member variable to be as close to the criteria used in McNab+21 as I have been able to achieve, then produces a table and three plots along with some statistics about the difference between some of the notable values produced in McNab+21.
+
+
+NOTE: OUTDATED METHODS (PUBLIC AND PRIVATE)
+
+The following methods are outdated and will require some level of re-implementation to get working. They do not accurately reflect how the codebase is structured and should not be examined with the rest of the codebase in mind either.
+
+    1. getMedian()
+    2. makeTable()
+    3. writeTable()
+
+
+NOTE: UNUSED METHODS (PUBLIC AND PRIVATE)
+
+The following methods are not currently used in the implementation but are not necessarily outdated and may be useful either as a reference or tool for future implementations.
+
+    1. getClusterZ()
+    2. getClusterGalaxies()
+    3. getStdError()
+    4. plotStdError()
+    5. plotUncertainties()
