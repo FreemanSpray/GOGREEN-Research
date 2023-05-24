@@ -57,7 +57,7 @@ The evalLineFit() method generates a set of data points at a random place on an 
 
 The PlotMcNabPlots Method:
 
-The plotMcNabPlots() method was created with the aim to exactly recreate several significant results regarding galaxy population counts for quiescent, star-forming, green valley, blue quiescent, and post-starburst galaxies in the GOGREEN survey from McNab et. al. 2021. When called it sets the standardCriteria member variable to be as close to the criteria used in McNab+21 as I have been able to achieve, then produces a table and three plots along with some statistics about the difference between some of the notable values produced in McNab+21.
+The plotMcNabPlots() method was created with the aim to exactly recreate several significant results regarding galaxy population counts for quiescent, star-forming, green valley, blue quiescent, and post-starburst galaxies in the GOGREEN survey from McNab et. al. 2021. When called it sets the standardCriteria member variable to be as close to the criteria used in McNab+21 as I have been able to achieve, then produces a recreation of Figure 1 & Figure 3 and Table 2 from McNab+21 along with some statistics about the difference between some of the notable values reported in McNab+21.
 
 
 NOTE: OUTDATED METHODS (PUBLIC AND PRIVATE)

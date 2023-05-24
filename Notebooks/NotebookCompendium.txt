@@ -1,0 +1,33 @@
+Summary of all Jupyter Notebooks included in this folder
+
+
+McNab_Reproduction:
+
+A small notebook demonstrating the results of my experiment to reproduce figures 1 and 3 and table 2 from McNab et. al. 2021. 
+
+proposal_plots_updated:
+
+This is an adapted version of the original notebook used to assemble and store the catalogs used in the GOGREEN class. I modified it first per the instructions
+you wrote in previously for another student, getting it up to date with the most recent/relevant version, then removed the unnecessary plots at the 
+end and added the NUVMINV field to the stellar populations table to enable its use in the class.
+
+TestPlots:
+
+A small notebook demonstrating the use and results of the class' two test functions, testPlots() and evalLineFit().
+
+TransitionTrends:
+
+This notebook contains all plots relevant to the stellar mass-size relation and can be thought of as a compilation of results. Also contains some 
+statistical information about the data being plotted to indicate where we are lacking a solid basis for results. The result plots included are as 
+follows:
+
+    1. Trendlines for all 3 transition types compared to quiescent and star-forming
+    2. Field quiescent vs star-forming trend lines compared to van der Wel+14
+    3. Isolated trendlines for cluster vs field quiescent and star-forming with uncertainties
+    4. Isolated trendlines for cluster vs field in all 5 populations
+    5. Ioslated trendlines for cluster vs field and literature comparison of difference as a function of redshift
+    6. Trendlines for cluster vs field, quiescent cluster vs field, and star-forming cluster vs field
+    7. Trendlines for spec vs phot catalog, elliptical vs spiral, quiescent vs star-forming (cluster only)
+    8. Cluster galaxies for all 11 clusters in subplots
+
+

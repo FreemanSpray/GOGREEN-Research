@@ -343,7 +343,7 @@ class GOGREEN:
 
     def plotMcNabPlots(self):
         """
-        plotMcNabPlots plots two plots from McNab et. al. 2021
+        plotMcNabPlots plots three plots and a table from McNab et. al. 2021
 
         :return    :     plots are plotted
         """
