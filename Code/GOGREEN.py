@@ -13,13 +13,16 @@ import scipy.optimize as opt
 
 
 class GOGREEN:
-    def __init__(self, dataPath:str, priorCatalog:pd.DataFrame=pd.DataFrame()):
+    def __init__(self, dataPath:str, priorCatalog:pd.DataFrame=pd.DataFrame(), usePhotMembership:bool=True):
         """
         __init__ Constructor to define and initialize class members
 
         :param dataPath:       absolute path to the directory containing DR1/ and STRUCTURAL_PARA_v1.1_CATONLY/
                                 subdirectories
         :param priorCatalog:   If we already have our catalog up to date and recompiling to update something else, we pass it in as this parameter
+                                Default: Empty DataFrame
+        :param usePhotMembership: flag indicating whether photometric members should be included in the membership definition
+                                Default: True
         """ 
         
         self.catalog = pd.DataFrame()
@@ -37,12 +40,17 @@ class GOGREEN:
         self._photSourceCatalog = pd.DataFrame()
         self._specSourceCatalog = pd.DataFrame()
 
-        self.init(priorCatalog)
+        self.init(priorCatalog, usePhotMembership)
     # END __INIT__
 
-    def init(self, priorCatalog:pd.DataFrame=None):
+    def init(self, priorCatalog:pd.DataFrame=None, usePhotMembership:bool=True):
         """
         init Helper method for initializing catalogs
+
+        :param priorCatalog:   If we already have our catalog up to date and recompiling to update something else, it is passed in as this parameter
+                                Default: None
+        :param usePhotMembership: flag indicating whether photometric members should be included in the membership definition
+                                Default: True
         """ 
         # Build path string to the cluster catalog
         clusterCatPath = self._path + 'DR1/CATS/Clusters.fits'
@@ -118,8 +126,8 @@ class GOGREEN:
         # Generate flags for use in plotting
         self.generateFlags()
         # Establish membership
-        self.setMembers()
-        self.setNonMembers()
+        self.setMembers(usePhotMembership)
+        self.setNonMembers(usePhotMembership)
         # Set error values (necessary because the re_err values from Galfit are not adequate)
         self.setReErr()
         # Generate converted unit columns (kpc instead of arcsec) for re values.
@@ -215,38 +223,49 @@ class GOGREEN:
         return targetCluster['Redshift'].values[0]
     # END GETCLUSTERZ
 
-    def setMembers(self) -> pd.DataFrame:
+    def setMembers(self, usePhot:bool=True) -> pd.DataFrame:
         """
         setMembers Sets membership flag in the catalog based on criteria in McNab et. al. 2021
 
+        :param usePhot: Flag indicating whether photometric members should be included in the membership definition
+                                Default: True
         :return:            catalog is updated
         """
         # Intialize column
         self.catalog['member_adjusted'] = 0
         # McNab+21 criteria: (zq_spec>=3) & (member==1) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)<0.16)
         specZthreshold = (self.catalog['Redshift_Quality'] >= 3) & (self.catalog['member'] == 1) & (self.catalog['cluster_centric_distance_spec'] < 1000)
-        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) < 0.16) & (self.catalog['cluster_centric_distance_phot'] < 1000)
-        specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
-        # Establish reduced dataset of members
-        reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        if usePhot:
+            photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) < 0.16) & (self.catalog['cluster_centric_distance_phot'] < 1000)
+            specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
+            # Establish reduced dataset of members
+            reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        else: 
+            # Exclude phot in membership definition if user elects to do this
+            reduced = self.catalog[specZthreshold]
         # Update catalog
         self.catalog['member_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
     # END SETMEMBERS
 
-    def setNonMembers(self) -> pd.DataFrame:
+    def setNonMembers(self, usePhot:bool=True) -> pd.DataFrame:
         """
         setNonMembers Sets non-membership flag in the catalog based on criteria in McNab et. al. 2021
 
+        :param usePhot: Flag indicating whether photometric members should be included in the membership definition
+                                Default: True
         :return:            catalog is updated
         """
         # Intialize column
         self.catalog['nonmember_adjusted'] = 0
         # McNab+21 criteria: ((zq_spec>=3) & (member==0) ) | ( (( zq_spec<3) | (SPECID<0)) & (abs(zphot - zclust)>=0.16))
         specZthreshold = (self.catalog['Redshift_Quality'] >= 3) & ((self.catalog['member'] == 0) | (self.catalog['cluster_centric_distance_spec'] >= 1000))
-        photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) >= 0.16) | (self.catalog['cluster_centric_distance_phot'] >= 1000)
-        specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
-        # Establish reduced dataset of members
-        reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        if usePhot:
+            photZthreshold = (np.abs(self.catalog['zphot'].values - self.catalog['Redshift'].values) >= 0.16) | (self.catalog['cluster_centric_distance_phot'] >= 1000)
+            specZunderThreshold = (self.catalog['Redshift_Quality'] < 3) | (self.catalog['SPECID'] < 0)
+            # Establish reduced dataset of members
+            reduced = self.catalog[specZthreshold | ( specZunderThreshold & photZthreshold )]
+        else:
+            reduced = self.catalog[specZthreshold]
         # Update catalog
         self.catalog['nonmember_adjusted'] = self.catalog['cPHOTID'].isin(reduced['cPHOTID']).astype(int)
     # END SETNONMEMBERS
