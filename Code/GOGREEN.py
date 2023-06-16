@@ -650,13 +650,13 @@ class GOGREEN:
         errs = data['re_err_robust_converted'].values
         # Convert to fractional error
         errs = errs/size
-        # Calculate coefficients using line-fitting algorithm
+        # Calculate coefficients using line-fitting algorithm (output will be in log space)
         print(typeRestrict + " count: " + str(mass.shape[0]))
         s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=mass, ydata=size, sigma=errs, bounds=([-10, -10], [10, 10]), loss="huber") 
         slope = s[0]
         intercept = s[1]
         uncertainty = None
-        # Define x bounds
+        # Define x bounds (in log space)
         xBounds = np.array([9.8,11.5])
         # Plot lines
         if row != None and col != None:
@@ -668,7 +668,7 @@ class GOGREEN:
                 # Add white backline in case of plotting multiple fit lines in one plot
                 if color != 'black':
                     axes[row][col].plot(xBounds, intercept + slope*xBounds, color='white', linewidth=4)
-                # Plot the best fit line
+                # Plot the best fit line (in log space)
                 axes[row][col].plot(xBounds, intercept + slope*xBounds, color=color, label=lbl)
                 return
         if bootstrap:
@@ -677,7 +677,7 @@ class GOGREEN:
         # Add white backline in case of plotting multiple fit lines in one plot
         if color != 'black':
             plt.plot(xBounds, intercept + slope*xBounds, color='white', linewidth=4)
-        # Plot the best fit line
+        # Plot the best fit line (in log space)
         plt.plot(xBounds, intercept + slope*xBounds, color=color, label=lbl)
         return (slope, intercept, uncertainty)
     # END MSRFIT
@@ -781,7 +781,7 @@ class GOGREEN:
         # Fill in region
         plot.fill_between(xGrid, yBots, yTops, color=color, alpha=0.5) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
         # Return uncertainty boundaries
-        return (xGrid, yTops, yBots)
+        return (xGrid, yGrid)
     # END BOOTSTRAP
 
     def evalLineFit(self):
@@ -790,31 +790,45 @@ class GOGREEN:
         
         :return: estimated slope and intercept are displayed in comparison to the actual slope and intercept.
         """
-        # y = 1.213x - 2.44  <- arbitrary line equation we choose to test
+        # log(y) = 1.213log(x) - 2.44  <- arbitrary line equation we choose to test
         m = 1.213
         b = -2.44
+        xBounds = np.array([9.8,11.5])
         # Specify consistent random seed
         rng = np.random.RandomState(1234567890)
-        # Create random x value between 9.8 and 11.5
-        randXLine = 9.8 + rng.random()*2.7
-        # Create y value corresponding to our x on the arbitrary line
-        yLine = m*randXLine + b
-        # Create random uncertainty
-        randUnc = rng.random()/2
-        # Create set of 100 fake data points located at our random x
-        nFake = []
+        # Create random fractional uncertainty
+        randUncCap = rng.random()/2
+        # Create set of 100 fake data points
+        nFake = [[], [], []]
         for i in range(0, 100):
-            yFake = rng.normal(loc=yLine, scale=randUnc)
-            nFake.append((randXLine, yFake, yFake*randUnc))
-        # Fit a line through our fake data points
-        s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=nFake[0], ydata=nFake[1], sigma=nFake[2], bounds=([-10, -10], [10, 10]), loss="huber") 
+            # Create random x value (in log space) between 9.8 and 11.5
+            randXLineLg = 0.0001*rng.randint(xBounds[0]*10000, xBounds[1]*10000) # A wack but simple way to generate numbers with appropriate accuracy in a given range
+            # Convert x to linear space
+            randXLine = pow(10, randXLineLg)
+            # Create y value (in log space) corresponding to our x on the arbitrary line
+            yLineLg = m*randXLineLg + b
+            # Convert y to linear space
+            yLine = pow(10, yLineLg)
+            # Create fake data point using a normal distribution of uncertainties
+            yFake = rng.normal(loc=yLine, scale=randUncCap)
+            # Store our random x, random y, and uncertainty (non-fractional) on the random y
+            nFake[0].append(randXLine)
+            nFake[1].append(yFake)
+            nFake[2].append(yFake*randUncCap)
+        # Fit a line through our fake data points (output will be in log space)
+        s, _ = opt.curve_fit(f=lambda x, m, b: pow(10, m*np.log10(x) + b), xdata=nFake[0], ydata=nFake[1], sigma=nFake[2], bounds=([-10, -10], [10, 10]), loss="huber")
         # Extract results
         slope = s[0]
         intercept = s[1]
+        # Show fake data points (in log space)
+        plt.scatter(np.log10(nFake[0]), np.log10(nFake[1]))
+        # Show calculated trend line (in log space)
+
+        plt.plot(xBounds, intercept + slope*xBounds)
         # Display results
         print("Actual values: slope = " + str(m) + ", intercept = " + str(b))
         print("Estimated values: slope = " + str(slope) + ", intercept = " + str(intercept))
-        print("Difference: slope = " + str(abs(slope - m)) + ", intercept = " + str(abs(intercept - b)))
+        # We can't print the difference here because the values are so close that cancellation error dominates
     # END EVALLINEFIT
         
 
@@ -865,13 +879,12 @@ class GOGREEN:
                         targetXindices[1] = xVals.index(i)
                         break
                 # Plot lines
-                plt.plot([xVals[targetXindices[0]], xVals[targetXindices[0]]], [uncMemberQ[2][targetXindices[0]], uncNonMemberQ[1][targetXindices[0]]], color="blue")
-                plt.plot([xVals[targetXindices[1]], xVals[targetXindices[1]]], [uncMemberQ[1][targetXindices[1]], uncNonMemberQ[2][targetXindices[1]]], color="blue")
-                plt.plot([xVals[targetXindices[0]], xVals[targetXindices[0]]], [uncMemberQ[1][targetXindices[0]], uncNonMemberQ[2][targetXindices[0]]], color="red")
-                plt.plot([xVals[targetXindices[1]], xVals[targetXindices[1]]], [uncMemberQ[2][targetXindices[1]], uncNonMemberQ[1][targetXindices[1]]], color="red")
-                    #plt.plot([xVals[targetXindices[i]], xVals[targetXindices[i]]], [uncMemberSF[1][targetXindices[i]], uncNonMemberSF[2][targetXindices[i]]], color="green")
-                    #plt.plot([xVals[targetXindices[i]], xVals[targetXindices[i]]], [uncMemberSF[2][targetXindices[i]], uncNonMemberSF[1][targetXindices[i]]], color="orange")
-
+                linesQ = [self.getBootstrapIntervalYs(targetXindices[0], uncMemberQ, uncNonMemberQ), self.getBootstrapIntervalYs(targetXindices[1], uncMemberQ, uncNonMemberQ)]
+                linesSF = [self.getBootstrapIntervalYs(targetXindices[0], uncMemberSF, uncNonMemberSF), self.getBootstrapIntervalYs(targetXindices[1], uncMemberSF, uncNonMemberSF)]
+                plt.plot([xVals[targetXindices[0]], xVals[targetXindices[0]]], linesQ[0], color="red")
+                plt.plot([xVals[targetXindices[1]], xVals[targetXindices[1]]], linesQ[1], color="red")
+                plt.plot([xVals[targetXindices[0]] + 0.1, xVals[targetXindices[0]] + 0.1], linesSF[0], color="blue")
+                plt.plot([xVals[targetXindices[1]] + 0.1, xVals[targetXindices[1]] + 0.1], linesSF[1], color="blue")
         # Transition galaxy option
         if plotType == "transition":
             # Extracted desired quantities from data
@@ -926,8 +939,8 @@ class GOGREEN:
         if plotType == "lit":
             members = self.catalog.query('member_adjusted == 1 and goodData == 1')
             nonMembers = self.catalog.query('nonmember_adjusted == 1 and goodData == 1')
-            mMember, bMember, uncMember = self.MSRfit(data=members, useLog=[True, True], typeRestrict='cluster', color="green", bootstrap=bootstrap)
-            mNonMember, bNonMember, uncNonMember = self.MSRfit(data=nonMembers, useLog=[True, True], typeRestrict='field', color="orange", bootstrap=bootstrap)
+            mMember, bMember, _ = self.MSRfit(data=members, useLog=[True, True], typeRestrict='cluster', color="green", bootstrap=bootstrap)
+            mNonMember, bNonMember, _ = self.MSRfit(data=nonMembers, useLog=[True, True], typeRestrict='field', color="orange", bootstrap=bootstrap)
             # if x or y values are provided, return ratio at that value
             if x != None and y == None:
                 # Get ratios at a certain x value
@@ -969,6 +982,32 @@ class GOGREEN:
             # Return our ratio and a nan value in the second slot in case this is incorrectly accessed
             return (ratio, np.nan)  
     # END COMPTRENDS
+
+    def getBootstrapIntervalYs(self, targetIndex:int=None, region1:tuple=None, region2:tuple=None) -> list:
+        """
+        getBootstrapIntervalYs calculates the 68% confidence interval between two bootstrap uncertainty regions at a given index
+
+        :param targetIndex :     The index at which the comparison must be made
+                                  Default: None
+        :param region1     :     Tuple containing 2 lists: 1) The list of x values covering the region and 2) the list of lists of y values delineating the uncertainty of all bootstrap lines at all x values
+                                  Default: None
+        :param region2     :     Tuple containing 2 lists: 1) The list of x values covering the region and 2) the list of lists of y values delineating the uncertainty of all bootstrap lines at all x values
+                                  Default: None
+        """
+        # Initialize
+        size = len(region1[1][targetIndex])
+        diffs = np.empty((size,))
+        # Construct 1D list of differences between y values at the target index
+        for i in range(0, size):
+            diffs[i] = region1[1][targetIndex][i] - region2[1][targetIndex][i]
+        # Calculate average median between the two
+        medDiff = np.median(diffs)
+        # Calculate confidence interval
+        confUpper = np.percentile(diffs, 84)
+        confLower = np.percentile(diffs, 16)
+        # Return error bar
+        return [medDiff + confUpper, medDiff - confLower]
+    #END GETBOOTSTRAPINTERVALS
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
         """

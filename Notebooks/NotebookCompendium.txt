@@ -30,4 +30,6 @@ follows:
     7. Trendlines for spec vs phot catalog, elliptical vs spiral, quiescent vs star-forming (cluster only)
     8. Cluster galaxies for all 11 clusters in subplots
 
+KFlagCheck:
+
 
