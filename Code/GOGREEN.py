@@ -867,27 +867,23 @@ class GOGREEN:
             mNonMemberSF, bNonMemberSF, uncNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
             # Analyze bootstrap difference
             if bootstrap:
-                # Initialize
-                targetXindices = [None, None]
                 # Extract grid of x values used for bootstrap.
                 xVals = uncMemberQ[0].tolist()
-                # Find first target x (at ~ 10.45 log(M/Msun) - used to find correct y vals
-                for i in xVals:
-                    if i > 10.45:
-                        targetXindices[0] = xVals.index(i)
-                        break
-                # Find second target x (at ~ 11.2 log(M/Msun) - used to find correct y vals
-                for i in xVals:
-                    if i > 11.2:
-                        targetXindices[1] = xVals.index(i)
-                        break
-                # Plot lines
-                linesQ = [self.getBootstrapIntervalYs(targetXindices[0], uncMemberQ, uncNonMemberQ), self.getBootstrapIntervalYs(targetXindices[1], uncMemberQ, uncNonMemberQ)]
-                linesSF = [self.getBootstrapIntervalYs(targetXindices[0], uncMemberSF, uncNonMemberSF), self.getBootstrapIntervalYs(targetXindices[1], uncMemberSF, uncNonMemberSF)]
-                plt.plot([xVals[targetXindices[0]], xVals[targetXindices[0]]], linesQ[0], color="red")
-                plt.plot([xVals[targetXindices[1]], xVals[targetXindices[1]]], linesQ[1], color="red")
-                plt.plot([xVals[targetXindices[0]] + 0.1, xVals[targetXindices[0]] + 0.1], linesSF[0], color="blue")
-                plt.plot([xVals[targetXindices[1]] + 0.1, xVals[targetXindices[1]] + 0.1], linesSF[1], color="blue")
+                # Calculate diffs
+                diffsQ = self.getBootstrapDiffs(uncMemberQ, uncNonMemberQ)
+                diffsSF = self.getBootstrapDiffs(uncMemberSF, uncNonMemberSF)
+                # Plot mass vs diffs
+                plt.figure()
+                plt.plot(xVals, diffsQ[0], color='red')
+                plt.figure()
+                plt.plot(xVals, diffsSF[0], color='blue')
+                # Plot mass vs diff confidence intervals
+                plt.figure()
+                plt.plot(xVals, diffsQ[1], color='red')
+                plt.plot(xVals, diffsQ[2], color='red')
+                plt.figure()
+                plt.plot(xVals, diffsSF[1], color='blue')
+                plt.plot(xVals, diffsSF[2], color='blue')
         # Transition galaxy option
         if plotType == "transition":
             # Extracted desired quantities from data
@@ -986,31 +982,38 @@ class GOGREEN:
             return (ratio, np.nan)  
     # END COMPTRENDS
 
-    def getBootstrapIntervalYs(self, targetIndex:int=None, region1:tuple=None, region2:tuple=None) -> list:
+    def getBootstrapDiffs(self, region1:tuple=None, region2:tuple=None) -> list:
         """
-        getBootstrapIntervalYs calculates the 68% confidence interval between two bootstrap uncertainty regions at a given index
+        getBootstrapDiffs calculates the 68% confidence interval between two bootstrap uncertainty regions at a given index
 
-        :param targetIndex :     The index at which the comparison must be made
-                                  Default: None
         :param region1     :     Tuple containing 2 lists: 1) The list of x values covering the region and 2) the list of lists of y values delineating the uncertainty of all bootstrap lines at all x values
                                   Default: None
         :param region2     :     Tuple containing 2 lists: 1) The list of x values covering the region and 2) the list of lists of y values delineating the uncertainty of all bootstrap lines at all x values
                                   Default: None
+        :return            :     3-Tuple containing 3 lists: 1) The list of lists of differences between all y values at all x indices, the list of upper confidence intervals at all x indices, 
+                                  the list of lower confidence intervals at all x indices
         """
         # Initialize
-        size = len(region1[1][targetIndex])
-        diffs = np.empty((size,))
-        # Construct 1D list of differences between y values at the target index
-        for i in range(0, size):
-            diffs[i] = region1[1][targetIndex][i] - region2[1][targetIndex][i]
-        # Calculate average median between the two
-        medDiff = np.median(diffs)
-        # Calculate confidence interval
-        confUpper = np.percentile(diffs, 84)
-        confLower = np.percentile(diffs, 16)
-        # Return error bar
-        return [medDiff + confUpper, medDiff - confLower]
-    #END GETBOOTSTRAPINTERVALS
+        gridSize = len(region1[1]) # Same size as region1[0]
+        lineCount = len(region1[1][0])
+        diffs = np.empty((gridSize, lineCount))
+        confUpper = np.empty((gridSize,))
+        confLower = np.empty((gridSize,))
+        # Construct 2D list of differences between all y values at all x indices
+        for i in range(0, gridSize):
+            for j in range(0, lineCount):
+                diffs[i][j] = region1[1][i][j] - region2[1][i][j]
+        # Calculate medians (not being used in current implementation)
+        medDiffs = np.empty((gridSize,))
+        for i in range(0, gridSize):
+            medDiffs[i] = np.median(diffs[i])
+        # Calculate 1D list of 68% confidence intervals
+        for i in range(0, gridSize):
+            confUpper[i] = np.percentile(diffs[i], 84)
+            confLower[i] = np.percentile(diffs[i], 16)
+        # Return 3-tuple of diffs and confidence intervals
+        return diffs, confUpper, confLower
+    #END GETBOOTSTRAPDIFFS
 
     def getMedian(self, category:str='SF', xRange:list=None, yRange:list=None):
         """
@@ -1359,11 +1362,11 @@ class GOGREEN:
                                         Default: None
             :param col:                Specifies the column of the 2D array of subplots. For use when axes is not None.
                                         Default: None
-            :param bootstrap           Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
+            :param bootstrap:          Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
                                         Default: True
-            :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted (NOTE: this parameter assumes that you are plotting in log space)
+            :param plotErrBars:        Flag to indicate whether individual galaxies should have their Re error plotted (NOTE: this parameter assumes that you are plotting in log space)
                                         Default: False
-            :param plotTransitionType  Flag to indicate whether individual galaxies should have their Re error plotted
+            :param plotTransitionType: Allows for plotting a third category of data alongside two others (intended for use alongside 'passive' color type
                                         Default: None
                                         Value: GV - plot green valley trend
                                         Value: BQ - plot blue quiescent trend    
@@ -1551,7 +1554,7 @@ class GOGREEN:
                                     Value:   'sersic' -  elliptical vs spiral
                                     Value:   'environment' - cluster vs field
         :param colors:             Specifies what colors should be used when plotting
-                                    Default: None - random colors are generated
+                                    Default: None - default colors are used
                                     Value:   [(r,g,b), (r,g,b)]
         :param useStandards:       Flag to indicate whether the standard search criteria should be applied
                                     Default: True
@@ -1570,11 +1573,11 @@ class GOGREEN:
                                     Value:   [True,True] - both axis in log scale
         :param fitLine:            Flag to indicate whether a best fit line should be fit to the data. By default this line will plot size vs mass. 
                                     Default: False
-        :param bootstrap           Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
+        :param bootstrap:          Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
                                     Default: True
-        :param plotErrBars         Flag to indicate whether individual galaxies should have their Re error plotted
+        :param plotErrBars:        Flag to indicate whether individual galaxies should have their Re error plotted
                                     Default: False
-        :param plotTransitionType  Flag to indicate whether individual galaxies should have their Re error plotted
+        :param plotTransitionType: Allows for plotting a third category of data alongside two others (intended for use alongside 'passive' color type
                                     Default: None
                                     Value: GV - plot green valley trend
                                     Value: BQ - plot blue quiescent trend    
