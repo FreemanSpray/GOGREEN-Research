@@ -1,28 +1,59 @@
 GOGREEN Class README
 
-Originally developed to be an efficient and adaptable plotting interface for the data from the GOGREEN survey, I have adapted and reworked this class to be specifically suited to research related to the environmental dependence of the stellar mass-size relation of galaxies in the survey. The need to construct and examine trendlines for this relation saw the addition of multiple private methods as well as three more public methods: testPlots(), evalLineFit() and compTrends(). I also reworked most of the functions previously created for the plot, for two primary reasons:
+This class was originally created by Christian Harris to be an efficient and extensible plotting interface for the data from the GOGREEN survey. It was designed to have only a single public (meaing intended for calling by the end user) method, the Plot method, and a single public member variable, standardCriteria. A user would first specify their search criteria by storing any number of queries to the GOGREEN catalog in the standardCriteria variable, then would call plot(), specifying the data characteristics to serve as the x and y axes, to produce a plot of the data that matched all provided criteria. Many other optional parameters were available to the user in the Plot method as well, most being ways to alter the presentation of the data but some allowing the user to alter the criteria without relying on the standardCriteria variable, for example the param:useMembers allowing users to restrict based on membership requirements defined in the class itself rather than in the survey catalog.
 
-    1. I refactored the Plot() function, sacrificing some readability in favor of efficiency. This was done partly for the sake of speed, but more so to make the function more easily adaptable, as while the simple code structure made it easy to add new features, each new feature made it increasingly difficult to implement global changes.
+In his original README, Christian described the code of the Plot method as being structured with KISS (Keep It Simple Stupid) design. This means each use case of the method is written separately (largely relying on nested IF blocks) and without reliance on helper functions, all without regard for reuse of code. The benefit of this structure is it makes it easy for future programmers to understand the workings of a specific case at a glance and to extend the functionality of the class without worry for impacting the functionality of the other cases. This allowed the class to be adapted for other projects as it will eventually need to be, while still keeping it simple enough that it can have broad application on its own.
 
-    2. Flag-based catalog implementation: the previous version of this class restricted the GOGREEN catalog in use by storing the catalog in variables and reducing the size of this catalog with each added restriction. This made adjustments to the pre-existing codebase, as well as general debugging, more difficult as it was not possible to reverse these reductions. Instead we turned to an implementation that utilizes only the base catalog, adding additional columns that act as 'flags' at compilation that can then be read at runtime to determine what category a galaxy belongs to.
+The version of the class you have before you now is one I have adapted and reworked to be specifically suited to research related to the environmental dependence of the stellar mass-size relation of galaxies in the survey. The need to construct and examine trendlines for this relation saw the addition of multiple private/helper methods as well as four more public methods: testPlots(), plotMcNabPlots(), evalLineFit() and compTrends(). I also reworked most of the functions previously created for the class, for two primary reasons:
+
+    1. I heavily refactored the Plot() function to step away from KISS design principles, sacrificing some readability in favor of efficiency. This was done partly for the sake of speed, but more so to make the function more easily adaptable to my project's specific needs in the future, as while the simple code structure made it easy to add new features in the same vein as the original ones, each new feature made it increasingly difficult to implement global adjustments to the method, something that was necessary to provide more advanced functionality like trendlines.
+
+    2. Flag-based catalog implementation: the previous version of this class applied restriction criteria to the GOGREEN catalog by storing the catalog in variables and reducing the size of this catalog with each added restriction. This made adjustments to the pre-existing codebase, as well as general debugging, more difficult as it was not possible to reverse these reductions. Instead we turned to an implementation that utilizes only the base catalog, adding additional columns that act as 'flags' at compilation that can then be read at runtime to determine what category a galaxy belongs to.
 
 
 The Plot Method
 
 This function was originally the only public method of the class, designed to be the single interface for the user to the survey. After refactoring, it is still the primary interface for the user, however the portion of its functionality related to the treatment and plotting of the data are now handled by a private method, plotUnwrapped(). The plot() method is responsible for the following:
 
-    1. Initializing the plot and choosing colors (colors are population-based if not specified by player).
-    2. Constructing list of additional criteria (a separate list from those stored in the standardCriteria member variable) to be applied to the data. This includes membership specifications (based on param:useMembers) and cluster specifications (based on param:plotType).
-    3. Calls plotUnwrapped() in the appropriate way based on param:plotType (call is made 11 times for plot type 2, subplots)
+    1. Initializing the plot and choosing colors (colors are population-based if not specified by user).
+    2. Constructing a list of additional criteria (a separate list from those stored in the standardCriteria member variable) to be applied to the data. This includes membership specifications (based on param:useMembers) and cluster specifications (based on param:plotType).
+    3. Calls plotUnwrapped() in the appropriate way based on param:plotType (i.e. call is made 11 times for plot type 2, subplots)
     4. Formats plots appropriately based on param:plotType
 
 Return: the plot() method returns the same four return values returned by plotUnwrapped() (the size of the data being plotted, divided along population lines and for both the x and y axis. These return values are used only for testing accuracy, for example in the testPlots() method). Note that for plot type 2, these returns are totalled up first.
 
-Usage: the plot() method has three mandatory parameters: param:xQuantityName and param:yQuantityName which specify the values to plot on the respective axes, and param:plotType which determines whether galaxies from only a single cluster should be plotted, or galaxies from all clusters should be plotted in separate subplots or in a stack. Note that if the first of these plot types is used, param:clusterName is also to be considered mandatory, as the plot will fail to complete without it. param:clusterName does nothing otherwise.
+Usage: the plot() method has three mandatory parameters: param:xQuantityName and param:yQuantityName which specify the values to plot on the respective axes, and param:plotType which determines whether galaxies from only a single cluster should be plotted, or galaxies from all clusters should be plotted in separate subplots or in a stack. Note that if the first of these plot types is used, param:clusterName is also to be considered mandatory, as the plot will fail to complete without it. param:clusterName does nothing if another plot type is used.
 
-There are 13 additional parameters beyond the 4 specified above that alter how the data is presented, either by changing the data selection (param:useStandards, param:useMembers), the format of the data (param:useLog), the population divides of the data (param:colorType), the aesthetics of the plot (param:xRange, param:yRange, param:xLabel, param:yLabel, param:colors), or with the plotting of additional information (param:fitline, param:bootstrap, param:plotErrBars, param:plotTransitionType).
+There are 13 additional parameters beyond the 4 specified above that alter how the data is presented, by changing either ... :
 
-An important note is that the following 8 parameters are not utilized directly in plot(), but are included to be passed to plotUnwrapped(): param:xQuantityName, param:yQuantityName,  param:useStandards, param:useLog, param:fitline, param:bootstrap, param:plotErrBars, param:plotTransitionType. 
+- the data selection 
+    - param:useStandards
+    - param:useMembers
+- the format of the data
+    - param:useLog
+- the population divides of the data
+    - param:colorType
+- the aesthetics of the plot 
+    - param:xRange
+    - param:yRange
+    - param:xLabel
+    - param:yLabel
+    - param:colors
+- the plotting of additional information
+    - param:fitline
+    - param:bootstrap
+    - param:plotErrBars
+    - param:plotTransitionType
+
+An important note is that the following 8 parameters are not utilized directly in plot(), but are included to be passed to plotUnwrapped(): 
+- param:xQuantityName
+- param:yQuantityName
+- param:useStandards
+- param:useLog
+- param:fitline
+- param:bootstrap
+- param:plotErrBars
+- param:plotTransitionType 
 
 Information regarding the data types, default and accepted values of all 17 parameters (as for all other methods) can be found in the documentation above the method in GOGREEN.py. 
 
@@ -33,7 +64,7 @@ The testPlots() method was created to act as a security check whenever large-sca
 
     1. Every plotted x value has a corresponding y value.
     2. Different xQuantityName and yQuantityName values do not impact the number of galaxies plotted.
-    3. The total number of galaxies plotted in each invidual cluster (total of 11 plots of plot type 1) is the same as the number of cluster galaxies plotted in a stack (plot type 3). The same is done for the field sample associated with each cluster. It is also verified that these numbers are consistent for different population splits (i.e. quiescent vs star-forming).
+    3. The total number of galaxies plotted in each individual cluster (total of 11 plots of plot type 1) is the same as the number of cluster galaxies plotted in a stack (plot type 3). The same is done for the field sample associated with each cluster. It is also verified that these numbers are consistent for different population splits (i.e. quiescent vs star-forming).
     4. The numbers produced in this test are correct according to the truth values specified in the file GOGREEN-Research\Notebooks\truth.txt. Note that if changes have been made to the codebase that intentionally alter the number of data points plotted by the plot() method, this truth file is no longer valid and will cause this test to fail. I recommend first verifying all other tests pass, then verifying through some other means that the specific numbers of galaxies being plotted are valid, then finally replacing the data in GOGREEN-Research\Notebooks\truth.txt with the data output by the testPlots() method, located in GOGREEN-Research\Notebooks\testOutput.txt.
 
 The CompTrends Method
@@ -52,7 +83,7 @@ Other parameters:
 
 The EvalLineFit Method:
 
-The evalLineFit() method generates a set of data points at a random place on an arbitrary line with random uncertainties, then fits a line to this data to determine the accuracy of the line-fitting method used. NOTE: THIS METHOD NEEDS WORK - LOOKING OVER IT I SUSPECT I MISUNDERSTOOD THE METHOD, AS VARYING ONLY THE UNCERTAINTY SEEMS COUNTERINTUITIVE TO GOOD DATA. COULD ALSO USE FURTHER EXPLORATION LIKE MORE RANDOM ATTEMPTS OR MORE LINE EQUATIONS - COULD TRY A CURVE.
+The evalLineFit() method generates a set of data points at a random place on an arbitrary line with random uncertainties, then fits a line to this data to determine the accuracy of the line-fitting method used. NOTE: THIS METHOD NEEDS WORK AND IS ON MY TODO LIST
 
 
 The PlotMcNabPlots Method:

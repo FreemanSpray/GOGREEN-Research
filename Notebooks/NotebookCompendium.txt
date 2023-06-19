@@ -1,21 +1,29 @@
 Summary of all Jupyter Notebooks included in this folder
 
 
-McNab_Reproduction:
+1) Tutorial:
+
+My summary notebook outlining the setup of the class and usage of all public methods provided in it.
+
+
+2) McNab_Reproduction:
 
 A small notebook demonstrating the results of my experiment to reproduce figures 1 and 3 and table 2 from McNab et. al. 2021. 
 
-proposal_plots_updated:
+
+3) proposal_plots_updated:
 
 This is an adapted version of the original notebook used to assemble and store the catalogs used in the GOGREEN class. I modified it first per the instructions
 you wrote in previously for another student, getting it up to date with the most recent/relevant version, then removed the unnecessary plots at the 
 end and added the NUVMINV field to the stellar populations table to enable its use in the class.
 
-TestPlots:
 
-A small notebook demonstrating the use and results of the class' two test functions, testPlots() and evalLineFit().
+4) TestPlots:
 
-TransitionTrends:
+A small notebook demonstrating the use and results of two of the class' test functions, testPlots() and evalLineFit().
+
+
+5) TransitionTrends:
 
 This notebook contains all plots relevant to the stellar mass-size relation and can be thought of as a compilation of results. Also contains some 
 statistical information about the data being plotted to indicate where we are lacking a solid basis for results. The result plots included are as 
@@ -30,6 +38,9 @@ follows:
     7. Trendlines for spec vs phot catalog, elliptical vs spiral, quiescent vs star-forming (cluster only)
     8. Cluster galaxies for all 11 clusters in subplots
 
-KFlagCheck:
 
+6) KFlagCheck:
+
+This notebook demonstrates the difference in stellar mass-size trend results that stems from using the more rigorous criteria 'K_flag == 0' as opposed
+to 'K_flag < 4'. 
 
