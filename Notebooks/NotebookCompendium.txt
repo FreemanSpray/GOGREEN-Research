@@ -44,3 +44,7 @@ follows:
 This notebook demonstrates the difference in stellar mass-size trend results that stems from using the more rigorous criteria 'K_flag == 0' as opposed
 to 'K_flag < 4'. 
 
+7) MembershipDefinitions:
+
+This notebook demonstrates the difference in population size when using only spectroscopic members as opposed to both spectroscopic and photometric
+

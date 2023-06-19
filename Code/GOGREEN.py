@@ -844,8 +844,6 @@ class GOGREEN:
                              Default: None
         :param bootstrap:   Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
                              Default: True
-        :param limitRange:  Flag to indicate whether the plot should be restricted to x = [9.8, 11.5] and y = [-0.75, 1.25]
-                             Default: True
         :param plotType:    Determines specific behavior of the function
                              Value: "default" - quiescent and star-forming ratios are calculated separately
                              Value: "transition" - transition lines are plotted as well

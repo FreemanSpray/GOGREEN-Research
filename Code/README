@@ -83,7 +83,7 @@ Other parameters:
 
 The EvalLineFit Method:
 
-The evalLineFit() method generates a set of data points at a random place on an arbitrary line with random uncertainties, then fits a line to this data to determine the accuracy of the line-fitting method used. NOTE: THIS METHOD NEEDS WORK AND IS ON MY TODO LIST
+The evalLineFit() method generates a set of data points at a random place on an arbitrary line with random uncertainties, then fits a line to this data to determine the accuracy of the line-fitting method used.
 
 
 The PlotMcNabPlots Method:
