@@ -842,6 +842,8 @@ class GOGREEN:
                              Default: None
         :param y:           Y value at which the comparison should be made
                              Default: None
+        :param bootstrap:   Flag to indicate rather bootstrapping should be used to calculate and display uncertainty on the fit 
+                             Default: True
         :param limitRange:  Flag to indicate whether the plot should be restricted to x = [9.8, 11.5] and y = [-0.75, 1.25]
                              Default: True
         :param plotType:    Determines specific behavior of the function
@@ -866,43 +868,47 @@ class GOGREEN:
             mNonMemberQ, bNonMemberQ, uncNonMemberQ = self.MSRfit(data=passiveNonMembers, useLog=[True, True], typeRestrict='Quiescent field', color='orange', bootstrap=bootstrap)
             mNonMemberSF, bNonMemberSF, uncNonMemberSF = self.MSRfit(data=starFormingNonMembers, useLog=[True, True], typeRestrict='Star-Forming field', color='green', bootstrap=bootstrap)
             # Analyze bootstrap difference
-            if bootstrap:
-                # Extract grid of x values used for bootstrap.
-                xVals = uncMemberQ[0].tolist()
-                # Calculate diffs
-                diffsQ = self.getBootstrapDiffs(uncMemberQ, uncNonMemberQ)
-                diffsSF = self.getBootstrapDiffs(uncMemberSF, uncNonMemberSF)
-                # Plot mass vs diffs
-                plt.figure()
-                plt.plot(xVals, diffsQ[0], color='red')
-                plt.figure()
-                plt.plot(xVals, diffsSF[0], color='blue')
-                # Plot mass vs diff confidence intervals
-                plt.figure()
-                plt.plot(xVals, diffsQ[1], color='red')
-                plt.plot(xVals, diffsQ[2], color='red')
-                plt.figure()
-                plt.plot(xVals, diffsSF[1], color='blue')
-                plt.plot(xVals, diffsSF[2], color='blue')
-        # Transition galaxy option
-        if plotType == "transition":
-            # Extracted desired quantities from data
-            gvMembers = self.catalog.query('member_adjusted == 1 and greenValley == 1 and goodData == 1')
-            gvNonMembers = self.catalog.query('nonmember_adjusted == 1 and greenValley == 1 and goodData == 1')
-            bqMembers = self.catalog.query('member_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
-            bqNonMembers = self.catalog.query('nonmember_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
-            psbMembers = self.catalog.query('member_adjusted == 1 and postStarBurst == 1 and goodData == 1')
-            psbNonMembers = self.catalog.query('nonmember_adjusted == 1 and postStarBurst == 1 and goodData == 1')
-            # Plot trends (6 additional lines)
-            self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV cluster', color='purple', bootstrap=bootstrap)
-            self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV field', color='pink', bootstrap=bootstrap)
-            self.MSRfit(data=bqMembers, useLog=[True, True], typeRestrict='BQ cluster', color='black', bootstrap=bootstrap)
-            self.MSRfit(data=bqNonMembers, useLog=[True, True], typeRestrict='BQ field', color='gray', bootstrap=bootstrap)
-            self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB cluster', color='brown', bootstrap=bootstrap)
-            # Not plotting psbNonMembers because it will crash due to there being too few data points.
-            #self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB field', color='yellow', bootstrap=bootstrap)
-        # Ratio calculation for default or transition option
-        if plotType == "default" or plotType == "transition":
+            if plotType == "default":
+                # Format plot
+                plt.legend()
+                # Handle bootstrap analysis
+                if bootstrap:
+                    # Extract grid of x values used for bootstrap.
+                    xVals = uncMemberQ[0].tolist()
+                    # Calculate diffs
+                    diffsQ = self.getBootstrapDiffs(uncMemberQ, uncNonMemberQ)
+                    diffsSF = self.getBootstrapDiffs(uncMemberSF, uncNonMemberSF)
+                    # Plot mass vs diffs
+                    plt.figure()
+                    plt.plot(xVals, diffsSF[0], color='blue')
+                    plt.figure()
+                    plt.plot(xVals, diffsQ[0], color='red')
+                    # Plot mass vs diff confidence intervals
+                    plt.figure()
+                    plt.plot(xVals, diffsSF[1], color='blue')
+                    plt.plot(xVals, diffsSF[2], color='blue')
+                    plt.figure()
+                    plt.plot(xVals, diffsQ[1], color='red')
+                    plt.plot(xVals, diffsQ[2], color='red')
+            # Transition galaxy option
+            elif plotType == "transition":
+                # Extracted desired quantities from data
+                gvMembers = self.catalog.query('member_adjusted == 1 and greenValley == 1 and goodData == 1')
+                gvNonMembers = self.catalog.query('nonmember_adjusted == 1 and greenValley == 1 and goodData == 1')
+                bqMembers = self.catalog.query('member_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
+                bqNonMembers = self.catalog.query('nonmember_adjusted == 1 and blueQuiescent == 1 and goodData == 1')
+                psbMembers = self.catalog.query('member_adjusted == 1 and postStarBurst == 1 and goodData == 1')
+                psbNonMembers = self.catalog.query('nonmember_adjusted == 1 and postStarBurst == 1 and goodData == 1')
+                # Plot trends (6 additional lines)
+                self.MSRfit(data=gvMembers, useLog=[True, True], typeRestrict='GV cluster', color='purple', bootstrap=bootstrap)
+                self.MSRfit(data=gvNonMembers, useLog=[True, True], typeRestrict='GV field', color='pink', bootstrap=bootstrap)
+                self.MSRfit(data=bqMembers, useLog=[True, True], typeRestrict='BQ cluster', color='black', bootstrap=bootstrap)
+                self.MSRfit(data=bqNonMembers, useLog=[True, True], typeRestrict='BQ field', color='gray', bootstrap=bootstrap)
+                self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB cluster', color='brown', bootstrap=bootstrap)
+                self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB field', color='yellow', bootstrap=bootstrap)
+                # Format plot
+                plt.legend() 
+            # Ratio calculation for default or transition option
             # if x or y values are provided, return ratio at that value
             if x != None and y == None:
                 # Get ratios at a certain x value
@@ -927,11 +933,6 @@ class GOGREEN:
             else:
                 print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
                 return (np.nan, np.nan)  
-            # Format plot
-            if limitRange:
-                plt.xlim(9.8, 11.5)
-                plt.ylim(-0.75, 1.25)
-            plt.legend() 
             # Return a tuple containing the ratios
             return (ratioQ, ratioSF)
         # Ratio calculation for lit option
@@ -961,9 +962,6 @@ class GOGREEN:
                 print("Error: No point of comparison provided. Please provide an x or y value to test the ratio of.")
                 return (np.nan, np.nan) 
             # Format plot
-            if limitRange:
-                plt.xlim(9.8, 11.5)
-                plt.ylim(-0.75, 1.25)
             plt.legend()
             # Construct lit comparison plot
             plt.figure()
@@ -979,7 +977,10 @@ class GOGREEN:
             plt.ylim(-0.2, 0.35)
             plt.legend()
             # Return our ratio and a nan value in the second slot in case this is incorrectly accessed
-            return (ratio, np.nan)  
+            return (ratio, np.nan)
+        # Error case, for if an incorrect plotType is provided.
+        print("Error: plot type not recognized. Please try again.")
+        return (np.nan, np.nan)  
     # END COMPTRENDS
 
     def getBootstrapDiffs(self, region1:tuple=None, region2:tuple=None) -> list:
