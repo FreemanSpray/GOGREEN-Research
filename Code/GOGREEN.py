@@ -1207,11 +1207,14 @@ class GOGREEN:
         f.write(str(b) + ' ')    
     # END MAKETABLE
 
-    def testPlots(self):
+    def testPlots(self, outputPath, truthPath):
         """
         Makes a series of test plots, stores and analyzes the data counts resulting from each plot to judge the accuracy of the plot() function.
 
-        :return: counts are written to file C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt
+        :param outputPath:  the file path that results will be written to.
+        :param truthPath:  the file path that true values are stored in prior to calling, to be compared with results.
+
+        :return:            test results are printed along with plots
         """
         # Establish criteria
         searchCriteria = [
@@ -1232,7 +1235,7 @@ class GOGREEN:
             warnings.simplefilter("ignore")
             warnings.warn("deprecated", DeprecationWarning)
             # Open file for writing
-            f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'w')
+            f = open(outputPath, 'w')
             # Establish variables for first test
             memberStatus = ["all", "only", "not"]
             plotType = [1, 2, 3]
@@ -1310,10 +1313,11 @@ class GOGREEN:
                 print("test failed. Totaled Individual and combined field counts do not agree.")
                 return
             f.close()
-            f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/testOutput.txt', 'r')
+            # Open output and truth files for reading
+            f = open(outputPath, 'r')
             testOutput = f.read()
             f.close()
-            f = open('C:/Users/panda/Documents/Github/GOGREEN-Research/Notebooks/truth.txt', 'r')
+            f = open(truthPath, 'r')
             expectedOutput = f.read()
             f.close()
             # Print result
