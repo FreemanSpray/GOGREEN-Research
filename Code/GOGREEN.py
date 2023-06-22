@@ -879,15 +879,27 @@ class GOGREEN:
                     # Plot mass vs diffs
                     plt.figure()
                     plt.plot(xVals, diffsSF[0], color='blue')
+                    plt.xlabel("log Mstellar/Msun")
+                    plt.ylabel("log Re (cluster) - log Re (field)")
+                    plt.title("Environmental differences of 100 bootstrap lines for star-forming population")
                     plt.figure()
                     plt.plot(xVals, diffsQ[0], color='red')
+                    plt.xlabel("log Mstellar/Msun")
+                    plt.ylabel("log Re (cluster) - log Re (field)")
+                    plt.title("Environmental differences of 100 bootstrap lines for quiescent population")
                     # Plot mass vs diff confidence intervals
                     plt.figure()
                     plt.plot(xVals, diffsSF[1], color='blue')
                     plt.plot(xVals, diffsSF[2], color='blue')
+                    plt.xlabel("log Mstellar/Msun")
+                    plt.ylabel("log Re (cluster) - log Re (field)")
+                    plt.title("68 percent confident interval of environmental differences for star-forming population")
                     plt.figure()
                     plt.plot(xVals, diffsQ[1], color='red')
                     plt.plot(xVals, diffsQ[2], color='red')
+                    plt.xlabel("log Mstellar/Msun")
+                    plt.ylabel("log Re (cluster) - log Re (field)")
+                    plt.title("68 percent confident interval of environmental differences for quiescent population")
             # Transition galaxy option
             elif plotType == "transition":
                 # Extracted desired quantities from data
