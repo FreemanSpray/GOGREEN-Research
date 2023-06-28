@@ -70,12 +70,12 @@ class GOGREEN:
         self._redshiftCatalog = self.generateDF(redshiftCatPath)
 
         # Build path string to the phot source catalogue
-        photSourceCatPath = self._path + 'STELLPOPS_V2/photometry_stellpops.fits'
+        photSourceCatPath = self._path + 'DR1/STELLPOPS_V2/photometry_stellpops.fits'
         # Generate a DataFrame of the catalog data
         self._photSourceCatalog = self.generateDF(photSourceCatPath)
 
         # Build path string to the spec source catalogue
-        specSourceCatPath = self._path + 'STELLPOPS_V2/redshifts_stellpops.fits'
+        specSourceCatPath = self._path + 'DR1/STELLPOPS_V2/redshifts_stellpops.fits'
         # Generate a DataFrame of the catalog data
         self._specSourceCatalog = self.generateDF(specSourceCatPath)
 
@@ -88,8 +88,8 @@ class GOGREEN:
 
         # Build a DataFrame for each galfit and matched structural parameter cluster (11 total)
         # Then combine them into a single galfit catalog and a single matched catalog
-        galfitCatPath = self._path + 'STRUCTURAL_PARA_v1.1_CATONLY/GALFIT_ORG_CATS/'
-        matchedCatPath = self._path + 'STRUCTURAL_PARA_v1.1_CATONLY/STRUCTCAT_MATCHED/'
+        galfitCatPath = self._path + 'DR1/STRUCTURAL_PARA_v1.1_CATONLY/GALFIT_ORG_CATS/'
+        matchedCatPath = self._path + 'DR1/STRUCTURAL_PARA_v1.1_CATONLY/STRUCTCAT_MATCHED/'
         for clusterName in self._structClusterNames:
             # Build filename strings
             galfitClusterFilename = 'gal_' + clusterName.lower() + '_orgcat.fits'
