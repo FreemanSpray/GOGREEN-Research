@@ -827,6 +827,8 @@ class GOGREEN:
         plt.scatter(np.log10(nFake[0]), np.log10(nFake[1]))
         # Show calculated trend line (in log space)
 
+        plt.xlabel("log Mstellar (Msun)")
+        plt.ylabel("log Re (kpc)")
         plt.plot(xBounds, intercept + slope*xBounds)
         # Display results
         print("Actual values: slope = " + str(m) + ", intercept = " + str(b))
@@ -869,6 +871,8 @@ class GOGREEN:
             if plotType == "default":
                 # Format plot
                 plt.legend()
+                plt.xlabel("log Mstellar (Msun)")
+                plt.ylabel("log Re (kpc)")
                 # Handle bootstrap analysis
                 if bootstrap:
                     # Extract grid of x values used for bootstrap.
@@ -879,25 +883,25 @@ class GOGREEN:
                     # Plot mass vs diffs
                     plt.figure()
                     plt.plot(xVals, diffsSF[0], color='blue')
-                    plt.xlabel("log Mstellar/Msun")
+                    plt.xlabel("log Mstellar (Msun)")
                     plt.ylabel("log Re (cluster) - log Re (field)")
                     plt.title("Environmental differences of 100 bootstrap lines for star-forming population")
                     plt.figure()
                     plt.plot(xVals, diffsQ[0], color='red')
-                    plt.xlabel("log Mstellar/Msun")
+                    plt.xlabel("log Mstellar (Msun)")
                     plt.ylabel("log Re (cluster) - log Re (field)")
                     plt.title("Environmental differences of 100 bootstrap lines for quiescent population")
                     # Plot mass vs diff confidence intervals
                     plt.figure()
                     plt.plot(xVals, diffsSF[1], color='blue')
                     plt.plot(xVals, diffsSF[2], color='blue')
-                    plt.xlabel("log Mstellar/Msun")
+                    plt.xlabel("log Mstellar (Msun)")
                     plt.ylabel("log Re (cluster) - log Re (field)")
                     plt.title("68 percent confident interval of environmental differences for star-forming population")
                     plt.figure()
                     plt.plot(xVals, diffsQ[1], color='red')
                     plt.plot(xVals, diffsQ[2], color='red')
-                    plt.xlabel("log Mstellar/Msun")
+                    plt.xlabel("log Mstellar (Msun)")
                     plt.ylabel("log Re (cluster) - log Re (field)")
                     plt.title("68 percent confident interval of environmental differences for quiescent population")
             # Transition galaxy option
@@ -917,7 +921,9 @@ class GOGREEN:
                 self.MSRfit(data=psbMembers, useLog=[True, True], typeRestrict='PSB cluster', color='brown', bootstrap=bootstrap)
                 self.MSRfit(data=psbNonMembers, useLog=[True, True], typeRestrict='PSB field', color='yellow', bootstrap=bootstrap)
                 # Format plot
-                plt.legend() 
+                plt.legend()
+                plt.xlabel("log Mstellar (Msun)")
+                plt.ylabel("log Re (kpc)") 
             # Ratio calculation for default or transition option
             # if x or y values are provided, return ratio at that value
             if x != None and y == None:
@@ -973,6 +979,8 @@ class GOGREEN:
                 return (np.nan, np.nan) 
             # Format plot
             plt.legend()
+            plt.xlabel("log Mstellar (Msun)")
+            plt.ylabel("log Re (kpc)") 
             # Construct lit comparison plot
             plt.figure()
             # Cooper+12 measured ~0.1 at redshift ~0.8
@@ -1494,7 +1502,7 @@ class GOGREEN:
                     cXVals = np.log10(cXVals)
                 if useLog[1] == True:
                     cYVals = np.log10(cYVals)
-                plot.scatter(cXVals, cYVals, alpha=0.5, s=70, marker=mrk.MarkerStyle(marker='s', fillstyle='none'), color=cColor)
+                plot.scatter(cXVals, cYVals, alpha=0.5, s=70, marker=mrk.MarkerStyle(marker='s', fillstyle='none'), color=cColor, label=cLbl)
             if plotErrBars:
                 # Extract error values
                 if yQuantityName == 're':
@@ -1570,7 +1578,7 @@ class GOGREEN:
                                     Value:   'environment' - cluster vs field
         :param colors:             Specifies what colors should be used when plotting
                                     Default: None - default colors are used
-                                    Value:   [(r,g,b), (r,g,b)]
+                                    Value:   [str, str] where each str is a color name
         :param useStandards:       Flag to indicate whether the standard search criteria should be applied
                                     Default: True
         :param xRange:             List containing the desired lower and upper bounds for the x-axis
